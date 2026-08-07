@@ -1,0 +1,45 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "NeuraGest",
+  "version": "1.0.0",
+  "identifier": "com.neuralive.neuragest",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": "default-src 'self' customprotocol: asset: http://localhost:* http://127.0.0.1:*; connect-src 'self' ipc: http://ipc.localhost http://localhost:* http://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://api.twitch.tv https://id.twitch.tv wss://eventsub.wss.twitch.tv https://discord.com; img-src 'self' asset: https: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self'; frame-src 'self' https://player.twitch.tv https://www.twitch.tv"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "publisher": "NeuraLive",
+    "shortDescription": "Gestión profesional de talentos Twitch",
+    "longDescription": "Dashboard, operaciones, documentos y analítica para la agencia NeuraLive.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "REPLACE_WITH_TAURI_UPDATER_PUBLIC_KEY",
+      "endpoints": [],
+      "windows": {
+        "installMode": "passive"
+      },
+      "dialog": false
+    }
+  }
+}
