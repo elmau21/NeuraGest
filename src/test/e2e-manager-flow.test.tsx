@@ -1,11 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+﻿import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { LoginScreen } from '@/features/auth/LoginScreen'
 import { WarRoomPage } from '@/features/war-room/WarRoomPage'
 import { CrmPage } from '@/features/crm/CrmPage'
 import { useAuthStore } from '@/stores/auth-store'
+import { useAppStore } from '@/stores/app-store'
 
 vi.mock('@/services/twitch', () => ({
   isTauri: true,
@@ -59,8 +60,24 @@ vi.mock('@/hooks/useMetricHistory', () => ({
   }),
 }))
 
+vi.mock('@/services/org-presence', () => ({
+  subscribeOrgPresence: vi.fn(() => () => {}),
+  upsertMyPresence: vi.fn(),
+  clearMyPresence: vi.fn(),
+}))
+
+vi.mock('@/stores/toast-store', () => ({
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+  useToastStore: Object.assign(
+    vi.fn(() => ({ toasts: [] })),
+    { getState: () => ({ toasts: [], push: vi.fn(), dismiss: vi.fn() }) },
+  ),
+}))
+
 describe('E2E manager flow (Vitest + Testing Library)', () => {
   beforeEach(() => {
+    cleanup()
     useAuthStore.setState({
       status: 'unauthenticated',
       session: null,
@@ -68,16 +85,19 @@ describe('E2E manager flow (Vitest + Testing Library)', () => {
       oauthFlow: 'idle',
       error: null,
     })
+    useAppStore.setState({
+      hasCompletedTwitchSync: true,
+      twitchLoading: false,
+      helixStatus: 'connected',
+    })
   })
 
   it('login → war room → crear deal', async () => {
     const user = userEvent.setup()
 
-    // Login screen
     render(<LoginScreen />)
     expect(screen.getByRole('button', { name: /continuar con twitch/i })).toBeInTheDocument()
 
-    // Simular login exitoso (sin OAuth real)
     useAuthStore.setState({
       status: 'authenticated',
       session: {
@@ -90,6 +110,7 @@ describe('E2E manager flow (Vitest + Testing Library)', () => {
       oauthFlow: 'idle',
     })
 
+    cleanup()
     render(
       <MemoryRouter initialEntries={['/war-room']}>
         <Routes>
@@ -101,7 +122,7 @@ describe('E2E manager flow (Vitest + Testing Library)', () => {
 
     expect(await screen.findByRole('heading', { name: /war room \/ noc/i })).toBeInTheDocument()
 
-    // CRM — crear deal
+    cleanup()
     render(
       <MemoryRouter initialEntries={['/crm']}>
         <Routes>
