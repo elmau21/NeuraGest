@@ -1,6 +1,6 @@
 [package]
 name = "neuragest"
-version = "1.0.0"
+version = "1.0.1"
 description = "NeuraGest — gestión profesional de talentos Twitch"
 authors = ["NeuraLive"]
 license = "Proprietary"
@@ -42,3 +42,4 @@ dotenvy = "0.15"
 sha2 = "0.10"
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
 futures-util = "0.3"
+discord-rich-presence = "1.1"

@@ -25,6 +25,9 @@ import { useAppStore } from '@/stores/app-store'
 import { useMetricHistory } from '@/hooks/useMetricHistory'
 import type { Talent } from '@/types'
 import { MetricHistoryChart } from './MetricHistoryChart'
+import { ActiveUsersPanel } from '@/features/presence/ActiveUsersPanel'
+import { DashboardSkeleton } from '@/components/Skeleton'
+import { toastError, toastSuccess } from '@/stores/toast-store'
 
 type StatusFilter = 'all' | 'live' | 'offline'
 type SortKey = 'viewers' | 'name' | 'followers'
@@ -88,6 +91,9 @@ export function Dashboard() {
     : eventSub?.state === 'fallback_polling'
       ? 'Actualización cada 60s'
       : 'Consulta periódica'
+  const showSkeleton = !hasCompletedSync && (loading || talents.every((t) => t.id.startsWith('pending-')))
+
+  if (showSkeleton) return <DashboardSkeleton />
 
   const kpis = [
     { label: 'Talentos', value: number.format(filtered.length), meta: `${talents.length} en cartera`, icon: Users, tone: 'blue' },
@@ -112,6 +118,8 @@ export function Dashboard() {
         </div>
       </div>
 
+      <ActiveUsersPanel />
+
       <section className="bi-filterbar" aria-label="Filtros globales">
         <label className="bi-search">
           <Search size={15} />
@@ -131,7 +139,11 @@ export function Dashboard() {
           </select>
         </label>
         <span className="bi-filter-result">{filtered.length} de {talents.length} talentos</span>
-        <button className="bi-refresh" disabled={loading} onClick={() => void refresh()}>
+        <button className="bi-refresh" disabled={loading} onClick={() => void refresh().then(() => {
+          const err = useAppStore.getState().twitchError
+          if (err) toastError('No se pudo actualizar')
+          else toastSuccess('Sincronizado')
+        })}>
           <RefreshCw size={14} className={loading ? 'spinning' : ''} />
           {loading ? 'Actualizando' : 'Actualizar'}
         </button>

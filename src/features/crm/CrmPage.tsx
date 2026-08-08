@@ -15,6 +15,7 @@ import { deleteBrandRestriction, listBrandRestrictions, saveBrandRestriction, ty
 import { detectDealConflicts, hasBlockingConflicts } from '@/services/deal-conflicts'
 import { summarizeCrmSla } from '@/services/crm-sla'
 import { isTauri } from '@/services/twitch'
+import { logCrmDealActivity } from '@/services/audit'
 
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 })
 
@@ -116,6 +117,7 @@ export function CrmPage() {
         const exists = prev.some((d) => d.id === saved.id)
         return exists ? prev.map((d) => d.id === saved.id ? saved : d) : [saved, ...prev]
       })
+      void logCrmDealActivity('saved', saved.brandName, saved.id)
       setEditorOpen(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -155,7 +157,9 @@ export function CrmPage() {
 
   const remove = async (id: string) => {
     try {
+      const brand = deals.find((d) => d.id === id)?.brandName ?? 'patrocinio'
       await deleteSponsorshipDeal(id)
+      void logCrmDealActivity('deleted', brand, id)
       setDeals((prev) => prev.filter((d) => d.id !== id))
       setEditorOpen(false)
     } catch (err) {

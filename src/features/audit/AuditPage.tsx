@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw, Shield } from 'lucide-react'
-import { AUDIT_FILTER_LABELS, fetchAuditActivity, type AuditFilter } from '@/services/audit'
+import { Navigate } from 'react-router-dom'
+import { AUDIT_FILTER_LABELS, canViewAudit, fetchAuditActivity, type AuditFilter } from '@/services/audit'
 import type { ActivityItem } from '@/services/activity'
+import { useAuthStore } from '@/stores/auth-store'
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -13,7 +15,19 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('es-MX')
 }
 
+function actorSubtitle(item: ActivityItem): string | null {
+  if (item.actorLogin) {
+    const name = item.actorName?.trim()
+    if (name && name.toLowerCase() !== item.actorLogin.toLowerCase()) {
+      return `${name} · @${item.actorLogin}`
+    }
+    return `@${item.actorLogin}`
+  }
+  return item.actorName ?? null
+}
+
 export function AuditPage() {
+  const roles = useAuthStore((s) => s.roles)
   const [filter, setFilter] = useState<AuditFilter>('all')
   const [items, setItems] = useState<ActivityItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -29,12 +43,16 @@ export function AuditPage() {
 
   useEffect(() => { void load() }, [load])
 
+  if (!canViewAudit(roles)) {
+    return <Navigate to="/" replace />
+  }
+
   return (
     <>
       <div className="page-title">
         <div>
           <h1>Auditoría</h1>
-          <p>Actividad de roles, contratos y tareas — trazabilidad operativa.</p>
+          <p>Quién hizo qué: contratos, tareas, wiki, roles, CRM, sesiones y más.</p>
         </div>
         <button className="secondary" disabled={loading} onClick={() => void load()}><RefreshCw size={16}/></button>
       </div>
@@ -51,13 +69,16 @@ export function AuditPage() {
         <div className="activity-list ops-audit-list">
           {loading ? <p className="empty-state">Cargando auditoría…</p> : items.length === 0 ? (
             <p className="empty-state"><Shield size={20}/> Sin eventos para este filtro.</p>
-          ) : items.map((item) => (
-            <div key={item.id} className="activity-row ops-audit-row">
-              <span>{relativeTime(item.createdAt)}</span>
-              <p>{item.label}</p>
-              <small>{item.entityType} · {item.action}</small>
-            </div>
-          ))}
+          ) : items.map((item) => {
+            const who = actorSubtitle(item)
+            return (
+              <div key={item.id} className="activity-row ops-audit-row">
+                <span>{relativeTime(item.createdAt)}</span>
+                <p>{item.label}</p>
+                {who ? <small>{who}</small> : null}
+              </div>
+            )
+          })}
         </div>
       </div>
     </>

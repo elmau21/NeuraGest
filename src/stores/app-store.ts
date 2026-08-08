@@ -4,6 +4,7 @@ import { cachedTalents, isTauri, refreshTalents } from '@/services/twitch'
 import { persistTwitchSnapshots } from '@/services/supabase'
 import { notifyLiveTalents } from '@/services/discord'
 import { notifyTalentStreamChanges } from '@/services/native-alerts'
+import { notifyLiveSoundChanges } from '@/services/live-sound'
 import { logTalentLive } from '@/services/activity'
 import type { CalendarItem, Talent, TaskStatus, WorkTask } from '@/types'
 
@@ -91,6 +92,7 @@ export const useAppStore = create<AppState>()(
               useAppStore.getState().talents.filter((t) => t.isLive).map((t) => t.streamId ?? t.id),
             )
             const previousTalents = useAppStore.getState().talents
+            const hadCompletedSync = useAppStore.getState().hasCompletedTwitchSync
             const talents = completeTalentList(await refreshTalents(), useAppStore.getState().talents)
             set({
               talents,
@@ -105,6 +107,9 @@ export const useAppStore = create<AppState>()(
               .catch(() => set({ persistedToSupabase: false }))
             void notifyLiveTalents(talents, previousLive)
             void notifyTalentStreamChanges(talents, previousLive, previousTalents)
+            if (hadCompletedSync) {
+              notifyLiveSoundChanges(talents, previousTalents)
+            }
             for (const talent of talents) {
               if (talent.isLive && !previousLive.has(talent.streamId ?? talent.id)) {
                 void logTalentLive(talent.displayName, talent.viewers, talent.login)

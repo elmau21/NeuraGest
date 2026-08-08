@@ -42,9 +42,9 @@ export function BackfillPanel({ compact }: Props) {
   return (
     <div className="card">
       <h3><History size={16}/> Importar historial</h3>
-      <p>Importa clips de Twitch de los últimos 30 días a la nube NeuraGest y captura métricas en vivo.</p>
+      <p>Trae clips y métricas de los últimos 30 días.</p>
       <button className="secondary" disabled={readonly || loading} onClick={() => void run()}>
-        <Download size={14}/>{loading ? 'Importando historial…' : 'Importar 30 días (métricas + clips)'}
+        <Download size={14}/>{loading ? 'Importando…' : 'Importar 30 días'}
       </button>
       {result && <p className="integration-note">{result}</p>}
       {error && <p className="integration-note">{error}</p>}

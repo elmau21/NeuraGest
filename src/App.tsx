@@ -1,11 +1,15 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { BrowserRouter, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Activity, ArrowRightLeft, BarChart3, BookOpen, CalendarDays, CheckSquare, ChevronDown, ChevronLeft, ChevronRight,
-  ClipboardList, DollarSign, FileText, FolderOpen, Handshake, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu,
-  Search, Settings, Shield, Sparkles, Users, Wallet, X, FileDown, CalendarCheck, Radio, Brain,
-  Globe, Columns2, Film, Archive, Cpu, LineChart,
+  Activity, BadgePercent, BookMarked, BrainCircuit, CalendarCheck, CalendarDays, ChartColumnIncreasing,
+  ChevronDown, ChevronLeft, ChevronRight, Clapperboard, Coins, DoorOpen, Files, FlaskConical,
+  GitCompareArrows, HeartHandshake, IdCard, Images, Kanban, ListTodo, Loader2, LogOut, Menu, NotebookPen,
+  PackageOpen, PanelsTopLeft, PieChart, Radar, Rocket, Search, Send, Settings2, ShieldCheck, UsersRound, X,
 } from 'lucide-react'
+import { PageTransition } from '@/components/PageTransition'
+import { ToastHost } from '@/components/ToastHost'
+import { TalentsSkeleton } from '@/components/Skeleton'
+import { toastError, toastSuccess } from '@/stores/toast-store'
 import { Dashboard } from '@/features/dashboard/Dashboard'
 import { Analytics } from '@/features/analytics/Analytics'
 import { PlatformStatsPage } from '@/features/platform-stats/PlatformStatsPage'
@@ -19,6 +23,9 @@ import { OAuthWaitingPanel } from '@/features/auth/OAuthWaitingPanel'
 import { PermissionsPanel } from '@/features/settings/PermissionsPanel'
 import { SupabaseStatusCard } from '@/features/settings/SupabaseStatusCard'
 import { DiscordSettings } from '@/features/settings/DiscordSettings'
+import { DiscordPresenceSync } from '@/features/settings/DiscordPresenceSync'
+import { OrgPresenceSync } from '@/features/presence/OrgPresenceSync'
+import { ActiveUsersBadge } from '@/features/presence/ActiveUsersBadge'
 import { GoogleCalendarSettings } from '@/features/settings/GoogleCalendarSettings'
 import { TwitchHelixSettings } from '@/features/settings/TwitchHelixSettings'
 import { BackfillPanel } from '@/features/settings/BackfillPanel'
@@ -26,7 +33,7 @@ import { TwitchTrackerPanel } from '@/features/settings/TwitchTrackerPanel'
 import { UpdaterPanel } from '@/features/settings/UpdaterPanel'
 import { ManagerTour } from '@/features/onboarding/ManagerTour'
 import { NativeAlertSettings } from '@/features/settings/NativeAlertSettings'
-import { TwitchOAuthDoc } from '@/features/settings/TwitchOAuthDoc'
+import { LiveSoundSettings } from '@/features/settings/LiveSoundSettings'
 import { TemplatesPanel } from '@/features/templates/TemplatesPanel'
 import { TasksPage } from '@/features/tasks/TasksPage'
 import { CalendarPage } from '@/features/calendar/CalendarPage'
@@ -49,7 +56,13 @@ import { MediaKitComparePage } from '@/features/media-kit/MediaKitComparePage'
 import { VodDigestPage } from '@/features/vod-digest/VodDigestPage'
 import { BoardPackPage } from '@/features/board-pack/BoardPackPage'
 import { useAuthStore } from '@/stores/auth-store'
-import { canMutateCrm } from '@/services/permissions'
+import {
+  canAccessPath,
+  canMutateCrm,
+  defaultPathForRoles,
+  isDevOnlyNav,
+} from '@/services/permissions'
+import { canViewAudit } from '@/services/audit'
 
 const MlPage = lazy(() => import('@/features/ml/MlPage'))
 const TalentProfilePage = lazy(() => import('@/features/talent-profile/TalentProfilePage'))
@@ -59,6 +72,7 @@ const SIDEBAR_SECTIONS_KEY = 'neuragest-sidebar-sections'
 
 type SidebarSectionState = Record<string, boolean>
 
+/** `true` / missing = colapsada; `false` = expandida. Por defecto todas colapsadas. */
 function readSidebarSections(): SidebarSectionState {
   try {
     const raw = localStorage.getItem(SIDEBAR_SECTIONS_KEY)
@@ -68,59 +82,63 @@ function readSidebarSections(): SidebarSectionState {
   }
 }
 
+function isSidebarSectionCollapsed(state: SidebarSectionState, title: string) {
+  return state[title] !== false
+}
+
 function writeSidebarSections(state: SidebarSectionState) {
   try {
     localStorage.setItem(SIDEBAR_SECTIONS_KEY, JSON.stringify(state))
   } catch { /* ignore */ }
 }
 
-type NavItem = readonly [string, string, typeof LayoutDashboard]
+type NavItem = readonly [string, string, typeof PanelsTopLeft]
 
 const navSections: ReadonlyArray<{ title: string; items: readonly NavItem[] }> = [
   {
     title: 'Ops',
     items: [
-      ['/', 'Dashboard', LayoutDashboard],
-      ['/war-room', 'War Room', Radio],
-      ['/talentos', 'Talentos', Users],
-      ['/pipeline', 'Pipeline', LayoutGrid],
-      ['/crm', 'CRM', Handshake],
+      ['/', 'Dashboard', PanelsTopLeft],
+      ['/war-room', 'War Room', Radar],
+      ['/talentos', 'Talentos', UsersRound],
+      ['/pipeline', 'Pipeline', Kanban],
+      ['/crm', 'CRM', HeartHandshake],
       ['/schedule', 'Schedule', CalendarCheck],
-      ['/comisiones', 'Comisiones', Wallet],
-      ['/portal', 'Portal', Globe],
+      ['/comisiones', 'Comisiones', Coins],
+      ['/portal', 'Portal', DoorOpen],
     ],
   },
   {
     title: 'Contenido',
     items: [
-      ['/rate-card', 'Rate Card', DollarSign],
-      ['/brief', 'Brief', ClipboardList],
-      ['/assets', 'Assets', FolderOpen],
-      ['/handoff', 'Handoff', ArrowRightLeft],
-      ['/media-kit', 'Media Kit', FileDown],
-      ['/media-kit/comparar', 'Comparar kits', Columns2],
-      ['/vod-digest', 'VOD digest', Film],
-      ['/board-pack', 'Board pack', Archive],
-      ['/onboarding', 'Onboarding', Sparkles],
-      ['/tareas', 'Tareas', CheckSquare],
-      ['/wiki', 'Wiki', BookOpen],
-      ['/documentos', 'Documentos', FileText],
+      ['/rate-card', 'Rate Card', BadgePercent],
+      ['/brief', 'Brief', NotebookPen],
+      ['/assets', 'Assets', Images],
+      ['/handoff', 'Handoff', Send],
+      ['/media-kit', 'Media Kit', IdCard],
+      ['/media-kit/comparar', 'Comparar kits', GitCompareArrows],
+      ['/vod-digest', 'VOD digest', Clapperboard],
+      ['/board-pack', 'Board pack', PackageOpen],
+      ['/onboarding', 'Onboarding', Rocket],
+      ['/tareas', 'Tareas', ListTodo],
+      ['/wiki', 'Wiki', BookMarked],
+      ['/documentos', 'Documentos', Files],
       ['/calendario', 'Calendario', CalendarDays],
     ],
   },
   {
     title: 'Datos',
     items: [
-      ['/inteligencia', 'Inteligencia', Brain],
-      ['/ciencia-datos', 'Ciencia de datos', Cpu],
-      ['/estadisticas', 'Estadísticas', LineChart],
-      ['/analitica', 'Analítica', BarChart3],
-      ['/auditoria', 'Auditoría', Shield],
+      ['/inteligencia', 'Inteligencia', BrainCircuit],
+      ['/ciencia-datos', 'Ciencia de datos', FlaskConical],
+      ['/estadisticas', 'Estadísticas', ChartColumnIncreasing],
+      ['/analitica', 'Analítica', PieChart],
+      ['/auditoria', 'Auditoría', ShieldCheck],
     ],
   },
-] 
+]
 
-const settingsNav: NavItem = ['/ajustes', 'Ajustes', Settings]
+const settingsNav: NavItem = ['/ajustes', 'Ajustes', Settings2]
 
 const navTourIds: Record<string, string> = {
   '/war-room': 'nav-war-room',
@@ -157,7 +175,18 @@ function Talents() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const filtered = talents.filter((t) => t.displayName.toLowerCase().includes(query.toLowerCase()))
-  return <><PageTitle title="Talentos" description="Rendimiento, actividad y perfiles de la agencia." action={<button className="primary" disabled={loading} onClick={() => void refreshTalentData()}><Activity size={16}/>{loading ? 'Actualizando…' : 'Actualizar Twitch'}</button>}/>
+  const showSkeleton = !hasCompletedSync && (loading || talents.every((t) => t.id.startsWith('pending-')))
+
+  const onRefresh = async () => {
+    await refreshTalentData()
+    const err = useAppStore.getState().twitchError
+    if (err) toastError('No se pudo actualizar Twitch')
+    else toastSuccess('Sincronizado')
+  }
+
+  if (showSkeleton) return <TalentsSkeleton />
+
+  return <><PageTitle title="Talentos" description="Rendimiento, actividad y perfiles de la agencia." action={<button className="primary" disabled={loading} onClick={() => void onRefresh()}><Activity size={16}/>{loading ? 'Actualizando…' : 'Actualizar Twitch'}</button>}/>
     <Card><div className="toolbar"><label className="search"><Search size={16}/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar talento..."/></label><button className="secondary">Todos los estados</button></div>
       <div className="talent-table"><div className="table-header"><span>Talento</span><span>Estado</span><span>Categoría</span><span>Followers</span><span>Viewers</span></div>
         {filtered.map((t) => <div className="table-row talent-row-clickable" key={t.id} role="button" tabIndex={0} onClick={() => navigate(`/talento/${t.login}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/talento/${t.login}`) } }}><div className="talent-cell">{t.avatar ? <img src={t.avatar} alt=""/> : <div className="avatar-placeholder">{t.displayName.slice(0, 2).toUpperCase()}</div>}<div><b>{t.displayName}</b><span>@{t.login}</span></div></div><span className={t.isLive ? 'status live' : 'status'}>{t.isLive ? '● En directo' : t.id.startsWith('pending-') ? 'Consultando…' : 'Offline'}</span><span>{t.category}</span><span>{t.followers > 0 ? t.followers.toLocaleString() : '—'}</span><span>{t.viewers.toLocaleString()} <ChevronRight size={15}/></span></div>)}
@@ -216,7 +245,6 @@ function SettingsPage() {
       {authError && oauthFlow === 'idle' && <p className="integration-note">{authError}</p>}
       {identityError && <p className="integration-note">Sincronización de cuenta: {identityError}</p>}
       {roles.length > 0 && <p className="integration-note">Roles: {roles.join(', ')}</p>}
-      <TwitchOAuthDoc/>
       {crmReadonly && roles.includes('staff') && <p className="integration-note staff-readonly-banner">Staff: CRM, permisos y wiki crítica en solo lectura.</p>}
       {oauthFlow !== 'idle' && (
         <OAuthWaitingPanel
@@ -228,16 +256,20 @@ function SettingsPage() {
       )}
     </Card>
     <Card><h3>Monitoreo Twitch</h3><p>Métricas públicas de talentos en tiempo casi real.</p>
-      <div className={`connection helix-connection ${helixStatus}`}><div className={helixStatus === 'connected' ? 'online-dot' : helixStatus === 'error' ? 'offline-dot' : 'pending-dot'}/><div><b>{helixLabel}</b><span>{helixStatus === 'connected' ? `Monitoreo activo${lastTwitchUpdate ? ` · actualizado ${new Date(lastTwitchUpdate).toLocaleTimeString()}` : ''}` : twitchError ?? 'Preparando consulta de métricas públicas'}</span></div><button className="secondary" onClick={() => void refreshTalentData()}>Reintentar</button></div>
+      <div className={`connection helix-connection ${helixStatus}`}><div className={helixStatus === 'connected' ? 'online-dot' : helixStatus === 'error' ? 'offline-dot' : 'pending-dot'}/><div><b>{helixLabel}</b><span>{helixStatus === 'connected' ? `Monitoreo activo${lastTwitchUpdate ? ` · actualizado ${new Date(lastTwitchUpdate).toLocaleTimeString()}` : ''}` : twitchError ?? 'Preparando consulta de métricas públicas'}</span></div><button className="secondary" onClick={() => void refreshTalentData().then(() => {
+        const err = useAppStore.getState().twitchError
+        if (err) toastError('No se pudo sincronizar')
+        else toastSuccess('Sincronizado')
+      })}>Reintentar</button></div>
     </Card>
     <TwitchHelixSettings/>
     <BackfillPanel/>
     <TwitchTrackerPanel/>
     <SupabaseStatusCard/>
     <NativeAlertSettings/>
+    <LiveSoundSettings/>
     <DiscordSettings/>
     <GoogleCalendarSettings/>
-    <Card><h3>Preferencias in-app</h3><p>Alertas nativas Windows, avisos a Discord o inbox de actividad.</p></Card>
     <UpdaterPanel/>
   </div>
     )}
@@ -248,8 +280,22 @@ function CommandPalette() {
   const open = useAppStore((s) => s.commandOpen)
   const setOpen = useAppStore((s) => s.setCommandOpen)
   const navigate = useNavigate()
+  const roles = useAuthStore((s) => s.roles)
+  const session = useAuthStore((s) => s.session)
+  const login = session?.login
   if (!open) return null
-  return <div className="modal-backdrop" onClick={() => setOpen(false)}><div className="command-modal" onClick={(e) => e.stopPropagation()}><div><Search size={19}/><input autoFocus placeholder="Buscar talentos, tareas, documentos…"/><kbd>ESC</kbd></div>{nav.filter(([to]) => to !== '/ajustes').map(([to,label,Icon]) => <button key={to} onClick={() => { navigate(to); setOpen(false) }}><Icon size={17}/>{label}<span>Ir a</span></button>)}</div></div>
+  const items = nav.filter(([to]) => to !== '/ajustes' && canAccessPath(roles, to, login))
+  return <div className="modal-backdrop" onClick={() => setOpen(false)}><div className="command-modal" onClick={(e) => e.stopPropagation()}><div><Search size={19}/><input autoFocus placeholder="Buscar talentos, tareas, documentos…"/><kbd>ESC</kbd></div>{items.map(([to,label,Icon]) => <button key={to} onClick={() => { navigate(to); setOpen(false) }}><Icon size={17} strokeWidth={1.75} absoluteStrokeWidth />{label}<span>Ir a</span></button>)}</div></div>
+}
+
+function RoleRouteGuard() {
+  const roles = useAuthStore((s) => s.roles)
+  const login = useAuthStore((s) => s.session)?.login
+  const location = useLocation()
+  if (!canAccessPath(roles, location.pathname, login)) {
+    return <Navigate to={defaultPathForRoles(roles, login)} replace />
+  }
+  return null
 }
 
 function Shell() {
@@ -261,7 +307,11 @@ function Shell() {
   const refreshTalentData = useAppStore((s) => s.refreshTalentData)
   const setCommandOpen = useAppStore((s) => s.setCommandOpen)
   const session = useAuthStore((s) => s.session)
+  const roles = useAuthStore((s) => s.roles)
   const logout = useAuthStore((s) => s.logout)
+  const login = session?.login
+  const showAudit = canViewAudit(roles)
+  const devOnly = isDevOnlyNav(roles, login)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -270,13 +320,27 @@ function Shell() {
       return next
     })
   }
+  const location = useLocation()
   const toggleSection = (title: string) => {
     setSectionCollapsed((prev) => {
-      const next = { ...prev, [title]: !prev[title] }
+      // Si estaba expandida (`false`), colapsar; si estaba colapsada (`true`/ausente), expandir.
+      const next = { ...prev, [title]: prev[title] === false }
       writeSidebarSections(next)
       return next
     })
   }
+  useEffect(() => {
+    const section = navSections.find((s) =>
+      s.items.some(([to]) => (to === '/' ? location.pathname === '/' : location.pathname === to || location.pathname.startsWith(`${to}/`))),
+    )
+    if (!section) return
+    setSectionCollapsed((prev) => {
+      if (!isSidebarSectionCollapsed(prev, section.title)) return prev
+      const next = { ...prev, [section.title]: false }
+      writeSidebarSections(next)
+      return next
+    })
+  }, [location.pathname])
   useEffect(() => { const onKey = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setCommandOpen(true) } if (e.key === 'Escape') { setCommandOpen(false); setUserMenuOpen(false) } }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey) }, [setCommandOpen])
   useEffect(() => {
     if (!userMenuOpen) return
@@ -299,26 +363,31 @@ function Shell() {
     const tourId = navTourIds[to]
     return (
       <NavLink key={to} to={to} end={to === '/'} onClick={() => setMobile(false)} title={collapsed ? label : undefined} data-tour={tourId}>
-        <Icon size={18} />
+        <Icon className="sidebar-icon" size={16} strokeWidth={1.75} absoluteStrokeWidth />
         <span className="sidebar-link-label">{label}</span>
       </NavLink>
     )
   }
-  return <div className={shellClass}><aside className={asideClass}>
+  return <div className={shellClass}><DiscordPresenceSync /><OrgPresenceSync /><aside className={asideClass}>
     <div className="sidebar-brand-header">
       <div className="brand">
         <div className="brand-mark" aria-hidden>NG</div>
         <img src={neuraliveLogotype} alt="NeuraGest by NeuraLive" className="brand-logotype" draggable={false} />
-        <button type="button" className="sidebar-mobile-close" onClick={() => setMobile(false)} aria-label="Cerrar menú"><X /></button>
+        <button type="button" className="sidebar-mobile-close" onClick={() => setMobile(false)} aria-label="Cerrar menú"><X size={16} /></button>
       </div>
       <small className="brand-app-name">NeuraGest</small>
     </div>
     <button type="button" className="sidebar-collapse-btn" onClick={toggleCollapsed} aria-label={collapsed ? 'Expandir sidebar' : 'Colapsar sidebar'} aria-expanded={!collapsed}>
-      {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+      {collapsed ? <ChevronRight size={14} strokeWidth={2} /> : <ChevronLeft size={14} strokeWidth={2} />}
     </button>
     <nav>
       {navSections.map((section) => {
-        const isSectionCollapsed = Boolean(sectionCollapsed[section.title])
+        const visibleItems = section.items.filter(([to]) => {
+          if (to === '/auditoria' && !showAudit) return false
+          return canAccessPath(roles, to, login)
+        })
+        if (visibleItems.length === 0) return null
+        const isSectionCollapsed = isSidebarSectionCollapsed(sectionCollapsed, section.title)
         return (
           <div
             className={`sidebar-section${isSectionCollapsed ? ' sidebar-section-collapsed' : ''}`}
@@ -329,30 +398,29 @@ function Shell() {
               className="sidebar-section-toggle"
               onClick={() => toggleSection(section.title)}
               aria-expanded={!isSectionCollapsed}
-              title={collapsed ? section.title : undefined}
             >
               <span className="sidebar-section-label">{section.title}</span>
-              {!collapsed && (
-                <ChevronDown
-                  size={14}
-                  className={`sidebar-section-chevron${isSectionCollapsed ? ' collapsed' : ''}`}
-                />
-              )}
+              <ChevronDown
+                size={12}
+                className={`sidebar-section-chevron${isSectionCollapsed ? ' collapsed' : ''}`}
+              />
             </button>
-            {!isSectionCollapsed && section.items.map(renderNavLink)}
+            {(collapsed || !isSectionCollapsed) && visibleItems.map(renderNavLink)}
           </div>
         )
       })}
-      <div className="sidebar-section sidebar-section-settings">
-        {renderNavLink(settingsNav)}
-      </div>
+      {!devOnly && (
+        <div className="sidebar-section sidebar-section-settings">
+          {renderNavLink(settingsNav)}
+        </div>
+      )}
     </nav>
     <div className="sidebar-footer" title={collapsed ? sidebarLabel : undefined}>
       <div className={sidebarDot} />
       <span>{sidebarLabel}<small>Monitoreo público + caché local</small></span>
     </div>
   </aside>
-    <main><header><button className="mobile-menu" onClick={() => setMobile(true)}><Menu/></button><button className="quick-search" onClick={() => setCommandOpen(true)}><Search size={16}/>Buscar en NeuraGest<kbd>Ctrl K</kbd></button><div className="header-actions"><ActivityInbox/><div className="user-menu-wrap"><button className="user-avatar" onClick={(e) => { e.stopPropagation(); setUserMenuOpen((open) => !open) }} aria-label="Menú de usuario">{session?.avatarUrl ? <img src={session.avatarUrl} alt="" /> : avatarLabel}</button>{userMenuOpen && <div className="user-menu" onClick={(e) => e.stopPropagation()}><div className="user-menu-head"><b>{session?.displayName ?? 'Usuario'}</b><span>@{session?.login ?? 'twitch'}</span></div><button onClick={() => { setUserMenuOpen(false); void logout() }}><LogOut size={15}/>Cerrar sesión</button></div>}</div></div></header><div className="content"><Routes><Route path="/" element={<Dashboard/>}/><Route path="/war-room" element={<WarRoomPage/>}/><Route path="/talentos" element={<Talents/>}/><Route path="/talento/:login" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando perfil…</div>}><TalentProfilePage/></Suspense>}/><Route path="/pipeline" element={<PipelinePage/>}/><Route path="/crm" element={<CrmPage/>}/><Route path="/rate-card" element={<RateCardPage/>}/><Route path="/brief" element={<BriefPage/>}/><Route path="/assets" element={<AssetsPage/>}/><Route path="/handoff" element={<HandoffPage/>}/><Route path="/comisiones" element={<CommissionsPage/>}/><Route path="/portal" element={<PortalPage/>}/><Route path="/portal/:login" element={<PortalPage/>}/><Route path="/media-kit" element={<MediaKitPage/>}/><Route path="/media-kit/comparar" element={<MediaKitComparePage/>}/><Route path="/vod-digest" element={<VodDigestPage/>}/><Route path="/board-pack" element={<BoardPackPage/>}/><Route path="/schedule" element={<ScheduleCompliancePage/>}/><Route path="/onboarding" element={<OnboardingPage/>}/><Route path="/tareas" element={<TasksPage/>}/><Route path="/wiki" element={<WikiPage/>}/><Route path="/documentos" element={<Documents/>}/><Route path="/calendario" element={<CalendarPage/>}/><Route path="/inteligencia" element={<TwitchIntelligencePage/>}/><Route path="/ciencia-datos" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense>}/><Route path="/ml" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense>}/><Route path="/estadisticas" element={<PlatformStatsPage/>}/><Route path="/analitica" element={<Analytics/>}/><Route path="/auditoria" element={<AuditPage/>}/><Route path="/ajustes" element={<SettingsPage/>}/></Routes></div></main><CommandPalette/><ManagerTour/></div>
+    <main><header><button className="mobile-menu" onClick={() => setMobile(true)}><Menu/></button><button className="quick-search" onClick={() => setCommandOpen(true)}><Search size={16}/>Buscar en NeuraGest<kbd>Ctrl K</kbd></button><div className="header-actions"><ActiveUsersBadge/><ActivityInbox/><div className="user-menu-wrap"><button className="user-avatar" onClick={(e) => { e.stopPropagation(); setUserMenuOpen((open) => !open) }} aria-label="Menú de usuario">{session?.avatarUrl ? <img src={session.avatarUrl} alt="" /> : avatarLabel}</button>{userMenuOpen && <div className="user-menu" onClick={(e) => e.stopPropagation()}><div className="user-menu-head"><b>{session?.displayName ?? 'Usuario'}</b><span>@{session?.login ?? 'twitch'}</span></div><button onClick={() => { setUserMenuOpen(false); void logout() }}><LogOut size={15}/>Cerrar sesión</button></div>}</div></div></header><div className="content"><RoleRouteGuard/><PageTransition><Routes location={location}><Route path="/" element={<Dashboard/>}/><Route path="/war-room" element={<WarRoomPage/>}/><Route path="/talentos" element={<Talents/>}/><Route path="/talento/:login" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando perfil…</div>}><TalentProfilePage/></Suspense>}/><Route path="/pipeline" element={<PipelinePage/>}/><Route path="/crm" element={<CrmPage/>}/><Route path="/rate-card" element={<RateCardPage/>}/><Route path="/brief" element={<BriefPage/>}/><Route path="/assets" element={<AssetsPage/>}/><Route path="/handoff" element={<HandoffPage/>}/><Route path="/comisiones" element={<CommissionsPage/>}/><Route path="/portal" element={<PortalPage/>}/><Route path="/portal/:login" element={<PortalPage/>}/><Route path="/media-kit" element={<MediaKitPage/>}/><Route path="/media-kit/comparar" element={<MediaKitComparePage/>}/><Route path="/vod-digest" element={<VodDigestPage/>}/><Route path="/board-pack" element={<BoardPackPage/>}/><Route path="/schedule" element={<ScheduleCompliancePage/>}/><Route path="/onboarding" element={<OnboardingPage/>}/><Route path="/tareas" element={<TasksPage/>}/><Route path="/wiki" element={<WikiPage/>}/><Route path="/documentos" element={<Documents/>}/><Route path="/calendario" element={<CalendarPage/>}/><Route path="/inteligencia" element={<TwitchIntelligencePage/>}/><Route path="/ciencia-datos" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense>}/><Route path="/ml" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense>}/><Route path="/estadisticas" element={<PlatformStatsPage/>}/><Route path="/analitica" element={<Analytics/>}/><Route path="/auditoria" element={showAudit ? <AuditPage/> : <Dashboard/>}/><Route path="/ajustes" element={<SettingsPage/>}/></Routes></PageTransition></div></main><CommandPalette/><ManagerTour/></div>
 }
 
 function AppGate() {
@@ -384,5 +452,5 @@ function AppGate() {
 }
 
 export default function App() {
-  return <BrowserRouter><AppGate/></BrowserRouter>
+  return <BrowserRouter><ToastHost /><AppGate/></BrowserRouter>
 }

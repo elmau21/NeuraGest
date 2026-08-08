@@ -12,6 +12,13 @@ const EMBED_KEYS: &[&str] = &[
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "TWITCHTRACKER_API_KEY",
+  "DISCORD_APPLICATION_ID",
+  "DISCORD_CLIENT_ID",
+  "NEURALIVE_URL",
+  "VITE_NEURALIVE_URL",
+  "DISCORD_INVITE_URL",
+  "NEURAGEST_DISCORD_INVITE",
+  "VITE_DISCORD_INVITE_URL",
 ];
 
 /// Parse a dotenv file; duplicate keys keep the **last** non-empty value.

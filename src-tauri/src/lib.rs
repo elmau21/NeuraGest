@@ -6,7 +6,7 @@ mod twitch;
 
 
 
-use std::net::TcpStream;
+use std::net::{TcpListener, TcpStream};
 
 use std::time::{Duration, Instant};
 
@@ -38,6 +38,20 @@ const EMBEDDED_ENV: &[(&str, Option<&str>)] = &[
 
   ("TWITCHTRACKER_API_KEY", option_env!("TWITCHTRACKER_API_KEY")),
 
+  ("DISCORD_APPLICATION_ID", option_env!("DISCORD_APPLICATION_ID")),
+
+  ("DISCORD_CLIENT_ID", option_env!("DISCORD_CLIENT_ID")),
+
+  ("NEURALIVE_URL", option_env!("NEURALIVE_URL")),
+
+  ("VITE_NEURALIVE_URL", option_env!("VITE_NEURALIVE_URL")),
+
+  ("DISCORD_INVITE_URL", option_env!("DISCORD_INVITE_URL")),
+
+  ("NEURAGEST_DISCORD_INVITE", option_env!("NEURAGEST_DISCORD_INVITE")),
+
+  ("VITE_DISCORD_INVITE_URL", option_env!("VITE_DISCORD_INVITE_URL")),
+
 ];
 
 
@@ -45,6 +59,12 @@ const EMBEDDED_ENV: &[(&str, Option<&str>)] = &[
 /// OAuth callback listeners â€” never reuse these for the UI asset server.
 
 const RESERVED_PORTS: &[u16] = &[14563, 14564];
+
+/// Preferred release UI port so the webview origin stays stable when free.
+
+/// Auth tokens are also persisted via Tauri store (not only localStorage).
+
+const PREFERRED_UI_PORT: u16 = 18420;
 
 
 
@@ -112,7 +132,21 @@ fn load_environment() {
 
 
 
+fn port_available(port: u16) -> bool {
+
+  TcpListener::bind(("127.0.0.1", port)).is_ok()
+
+}
+
+
+
 fn pick_ui_port() -> u16 {
+
+  if !RESERVED_PORTS.contains(&PREFERRED_UI_PORT) && port_available(PREFERRED_UI_PORT) {
+
+    return PREFERRED_UI_PORT;
+
+  }
 
   for _ in 0..64 {
 
@@ -458,11 +492,25 @@ pub fn run() {
 
       commands::usable_bridge::update_handoff_status,
 
+      commands::discord_rpc::discord_rpc_default_application_id,
+
+      commands::discord_rpc::discord_rpc_status,
+
+      commands::discord_rpc::discord_rpc_set_presence,
+
+      commands::discord_rpc::discord_rpc_clear,
+
     ])
 
-    .run(tauri::generate_context!())
+    .build(tauri::generate_context!())
 
-    .expect("error while running tauri application");
+    .expect("error while building tauri application")
+
+    .run(|_app, event| {
+      if let tauri::RunEvent::Exit = event {
+        commands::discord_rpc::shutdown();
+      }
+    });
 
 }
 

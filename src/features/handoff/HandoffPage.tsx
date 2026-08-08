@@ -13,6 +13,7 @@ import {
 } from '@/services/handoff'
 import { isTauri } from '@/services/twitch'
 import { useAuthStore } from '@/stores/auth-store'
+import { logHandoffActivity } from '@/services/audit'
 
 export function HandoffPage() {
   const appUserId = useAuthStore((s) => s.appUserId)
@@ -77,6 +78,7 @@ export function HandoffPage() {
         notes: form.notes,
       })
       setHandoffs((prev) => [row, ...prev])
+      void logHandoffActivity('created', { talentLogin: talent.login, status: row.status }, row.id)
       setFormOpen(false)
       setForm({ talentId: '', toManagerId: '', notes: '', openItemsSummary: '' })
       void reload()
@@ -107,6 +109,7 @@ export function HandoffPage() {
   const setStatus = async (id: string, status: HandoffStatus) => {
     try {
       const updated = await updateHandoffStatus(id, status)
+      void logHandoffActivity('updated', { status: updated.status }, updated.id)
       setHandoffs((prev) => prev.map((h) => (h.id === id ? updated : h)))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

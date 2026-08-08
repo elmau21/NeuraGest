@@ -1,6 +1,6 @@
 import { createCalendarEvent } from '@/services/calendar'
 import { createTask } from '@/services/tasks'
-import { supabase } from '@/services/supabase'
+import { logActivity } from '@/services/activity-log'
 
 export type TemplateKind = 'tournament' | 'campaign' | 'new_talent'
 
@@ -102,14 +102,11 @@ export async function applyTemplate(kind: TemplateKind): Promise<{ tasks: number
     if (created) eventCount += 1
   }
 
-  if (supabase) {
-    await supabase.rpc('log_activity', {
-      p_entity_type: 'template',
-      p_entity_id: null,
-      p_action: 'applied',
-      p_metadata: { template: template.title, tasks: taskCount, events: eventCount },
-    })
-  }
+  await logActivity('template', 'applied', {
+    template: template.title,
+    tasks: taskCount,
+    events: eventCount,
+  })
 
   return { tasks: taskCount, events: eventCount }
 }

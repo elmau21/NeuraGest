@@ -28,7 +28,7 @@ export function SupabaseStatusCard() {
   const statusLabel = checking
     ? 'Comprobando…'
     : health.status === 'no_credentials'
-      ? 'Sin credenciales'
+      ? 'No configurada'
       : healthOk
         ? 'OK'
         : 'Error'
@@ -36,7 +36,7 @@ export function SupabaseStatusCard() {
   const detail = checking
     ? '…'
     : health.status === 'no_credentials'
-      ? 'Falta .env'
+      ? 'Contacta al administrador'
       : connected
         ? [
             health.latencyMs != null ? `${health.latencyMs} ms` : null,

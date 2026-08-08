@@ -10,11 +10,11 @@ import {
   disconnectGoogleCalendar,
   googleOAuthStatus,
   syncGoogleCalendar,
-  GOOGLE_OAUTH_REDIRECT_TO,
 } from '@/services/google-calendar-oauth'
 import { useAuthStore } from '@/stores/auth-store'
 import { canMutate } from '@/services/permissions'
 import { isTauri } from '@/services/twitch'
+import { toastError, toastSuccess } from '@/stores/toast-store'
 
 export function GoogleCalendarSettings() {
   const [settings, setSettings] = useState<GoogleCalendarSettings>({
@@ -48,6 +48,8 @@ export function GoogleCalendarSettings() {
     if (readonly) return
     const ok = await saveGoogleCalendarSettings(settings)
     setSaved(ok)
+    if (ok) toastSuccess('Guardado')
+    else toastError('No se pudo guardar')
     window.setTimeout(() => setSaved(false), 1500)
   }
 
@@ -88,13 +90,13 @@ export function GoogleCalendarSettings() {
         ...prev,
         connected: false,
         connectedEmail: undefined,
-        oauthNote: 'Desconectado. Puedes seguir usando exportación ICS.',
+        oauthNote: 'Desconectado.',
       }))
       await saveGoogleCalendarSettings({
         ...settings,
         connected: false,
         connectedEmail: undefined,
-        oauthNote: 'Desconectado. Puedes seguir usando exportación ICS.',
+        oauthNote: 'Desconectado.',
       })
       setStatusMessage('Google Calendar desconectado.')
     } finally {
@@ -115,7 +117,7 @@ export function GoogleCalendarSettings() {
       }
       setSettings(next)
       await saveGoogleCalendarSettings(next)
-      setStatusMessage(`Sincronización completada · ${result.pulled} importados · ${result.pushed} exportados`)
+      setStatusMessage(`Listo · ${result.pulled} importados · ${result.pushed} exportados`)
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : String(error))
     } finally {
@@ -126,32 +128,24 @@ export function GoogleCalendarSettings() {
   return (
     <div className="card">
       <h3><CalendarDays size={16}/> Google Calendar</h3>
-      <p>Conexión con Google Calendar y exportación ICS desde Calendario. Sincronización bidireccional gratuita.</p>
+      <p>Sincroniza el calendario de NeuraLive con Google.</p>
       {!isTauri && (
-        <p className="integration-note">La conexión y sync requieren la app de escritorio NeuraGest.</p>
+        <p className="integration-note">Disponible en la app de escritorio NeuraGest.</p>
       )}
       <div className={`connection ${settings.connected ? 'connected' : ''}`}>
         <div className={settings.connected ? 'online-dot' : 'offline-dot'} />
         <div>
-          <b>{settings.connected ? 'Google conectado' : 'Google sin conectar'}</b>
-          <span>{settings.connectedEmail ?? settings.oauthNote ?? 'Usa ICS mientras configuras la conexión con Google.'}</span>
+          <b>{settings.connected ? 'Conectado' : 'Sin conectar'}</b>
+          <span>{settings.connectedEmail ?? settings.oauthNote ?? 'Conecta tu cuenta Google para sincronizar.'}</span>
         </div>
       </div>
       <label className="toggle-row">
-        Sync automático habilitado
+        Sync automático
         <input
           type="checkbox"
           checked={settings.syncEnabled}
           disabled={readonly || loading}
           onChange={(event) => setSettings({ ...settings, syncEnabled: event.target.checked })}
-        />
-      </label>
-      <label>
-        Calendar ID
-        <input
-          value={settings.calendarId}
-          readOnly={readonly}
-          onChange={(event) => setSettings({ ...settings, calendarId: event.target.value })}
         />
       </label>
       <div className="settings-session-actions">
@@ -170,25 +164,13 @@ export function GoogleCalendarSettings() {
           </>
         )}
         <button className="secondary" disabled={readonly || loading} onClick={() => void save()}>
-          {saved ? 'Guardado' : 'Guardar preferencias'}
+          {saved ? 'Guardado' : 'Guardar'}
         </button>
       </div>
       {settings.lastSyncAt && (
         <p className="integration-note">Última sincronización: {new Date(settings.lastSyncAt).toLocaleString('es-MX')}</p>
       )}
       {statusMessage && <p className="integration-note">{statusMessage}</p>}
-      <details className="gcal-oauth-doc">
-        <summary>Guía de conexión con Google (administradores)</summary>
-        <ol>
-          <li>Crea un proyecto en Google Cloud Console y habilita Google Calendar.</li>
-          <li>Pantalla de consentimiento (interno NeuraLive).</li>
-          <li>Credenciales de aplicación de escritorio.</li>
-          <li>URI de redirección autorizado: <code>{GOOGLE_OAUTH_REDIRECT_TO}</code></li>
-          <li>Configura las credenciales de Google en el archivo <code>.env</code> de la app.</li>
-          <li>La sync importa eventos de Google al calendario NeuraGest y exporta eventos locales.</li>
-        </ol>
-        <p className="integration-note">Alternativa sin conexión: «Exportar ICS» en la vista Calendario.</p>
-      </details>
     </div>
   )
 }

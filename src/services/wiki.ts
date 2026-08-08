@@ -1,5 +1,9 @@
 import { supabase } from '@/services/supabase'
 import { DEFAULT_ORG_ID } from '@/services/org'
+import { logActivity } from '@/services/activity-log'
+
+const wikiUpdateLogAt = new Map<string, number>()
+const WIKI_UPDATE_LOG_COOLDOWN_MS = 5 * 60_000
 
 export type WikiDocument = {
   id: string
@@ -35,9 +39,16 @@ export async function fetchWikiDocuments(): Promise<WikiDocument[]> {
 
 export async function createWikiDocument(title: string): Promise<WikiDocument | null> {
   if (!supabase) return null
+  const { data: { user } } = await supabase.auth.getUser()
   const { data, error } = await supabase
     .from('documents')
-    .insert({ organization_id: DEFAULT_ORG_ID, title, category: 'wiki', icon: '📄' })
+    .insert({
+      organization_id: DEFAULT_ORG_ID,
+      title,
+      category: 'wiki',
+      icon: '📄',
+      created_by: user?.id ?? null,
+    })
     .select('id,title,icon,updated_at')
     .single()
   if (error || !data) return null
@@ -48,12 +59,7 @@ export async function createWikiDocument(title: string): Promise<WikiDocument | 
     content: { text: '' },
     position: 1,
   })
-  await supabase.rpc('log_activity', {
-    p_entity_type: 'document',
-    p_entity_id: data.id,
-    p_action: 'wiki_created',
-    p_metadata: { title },
-  })
+  await logActivity('wiki', 'created', { title }, data.id)
   return { id: data.id, title: data.title, icon: data.icon ?? undefined, updatedAt: data.updated_at ?? undefined }
 }
 
@@ -96,6 +102,13 @@ export async function saveWikiContent(documentId: string, html: string, plainTex
     if (error) return false
   }
   await supabase.from('documents').update({ updated_at: new Date().toISOString() }).eq('id', documentId)
+
+  const last = wikiUpdateLogAt.get(documentId) ?? 0
+  if (Date.now() - last >= WIKI_UPDATE_LOG_COOLDOWN_MS) {
+    wikiUpdateLogAt.set(documentId, Date.now())
+    const { data: doc } = await supabase.from('documents').select('title').eq('id', documentId).maybeSingle()
+    await logActivity('wiki', 'updated', { title: doc?.title ?? 'wiki' }, documentId)
+  }
   return true
 }
 

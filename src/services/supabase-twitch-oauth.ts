@@ -126,11 +126,29 @@ export async function signInWithSupabaseTwitch(): Promise<SupabaseTwitchLoginRes
 
 export async function getActiveSupabaseTwitchProfile(): Promise<SupabaseTwitchLoginResult | null> {
   if (!supabase) return null
+
+  let session: Session | null = null
   const { data, error } = await supabase.auth.getSession()
-  if (error || !data.session?.user) return null
-  const profile = profileFromSupabaseUser(data.session.user, data.session)
+  const existing = !error ? data.session : null
+  const freshEnough =
+    existing?.user &&
+    (existing.expires_at ?? 0) * 1000 > Date.now() + 30_000
+
+  if (freshEnough && existing) {
+    session = existing
+  } else {
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession()
+    if (refreshError || !refreshed.session?.user) {
+      if (existing?.user) session = existing
+      else return null
+    } else {
+      session = refreshed.session
+    }
+  }
+
+  const profile = profileFromSupabaseUser(session.user, session)
   if (!profile) return null
-  await syncProviderTokens(data.session, profile).catch(() => undefined)
+  await syncProviderTokens(session, profile).catch(() => undefined)
   return profile
 }
 

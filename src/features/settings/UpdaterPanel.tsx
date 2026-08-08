@@ -33,7 +33,7 @@ export function UpdaterPanel() {
   return (
     <div className="card">
       <h3>Actualizaciones</h3>
-      <p>Canal estable · versión 1.0.0. Requiere configuración de firma (ver documentación de publicación).</p>
+      <p>Mantén NeuraLive al día.</p>
       <div className="settings-session-actions">
         <button className="secondary" disabled={loading} onClick={() => void check()}>
           <RefreshCw size={15}/>{loading ? 'Comprobando…' : 'Buscar actualizaciones'}

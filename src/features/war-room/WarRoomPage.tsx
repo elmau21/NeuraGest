@@ -4,12 +4,17 @@ import { useAppStore } from '@/stores/app-store'
 import { isTauri } from '@/services/twitch'
 import { useMetricHistory } from '@/hooks/useMetricHistory'
 import { MultiStreamMosaic } from './MultiStreamMosaic'
+import { ActiveUsersPanel } from '@/features/presence/ActiveUsersPanel'
+import { WarRoomSkeleton } from '@/components/Skeleton'
+import { toastError, toastSuccess } from '@/stores/toast-store'
 
 export function WarRoomPage() {
   const talents = useAppStore((s) => s.talents)
   const refreshTalentData = useAppStore((s) => s.refreshTalentData)
   const helixStatus = useAppStore((s) => s.helixStatus)
   const lastUpdate = useAppStore((s) => s.lastTwitchUpdate)
+  const hasCompletedSync = useAppStore((s) => s.hasCompletedTwitchSync)
+  const twitchLoading = useAppStore((s) => s.twitchLoading)
   const { snapshots, eventSub, reload, loading } = useMetricHistory(6)
 
   useEffect(() => {
@@ -23,6 +28,7 @@ export function WarRoomPage() {
   )
 
   const offlineCount = talents.length - liveTalents.length
+  const showSkeleton = !hasCompletedSync && (twitchLoading || talents.every((t) => t.id.startsWith('pending-')))
 
   if (!isTauri) {
     return (
@@ -32,6 +38,8 @@ export function WarRoomPage() {
     )
   }
 
+  if (showSkeleton) return <WarRoomSkeleton />
+
   return (
     <>
       <div className="page-title">
@@ -40,7 +48,13 @@ export function WarRoomPage() {
           <p>Centro de operaciones multi-live — mira y gestiona varios streams a la vez.</p>
         </div>
         <div className="page-actions">
-          <button className="secondary" disabled={loading} onClick={() => { void refreshTalentData(); void reload() }}>
+          <button className="secondary" disabled={loading} onClick={() => {
+            void refreshTalentData().then(() => reload()).then(() => {
+              const err = useAppStore.getState().twitchError
+              if (err) toastError('No se pudo actualizar')
+              else toastSuccess('Sincronizado')
+            })
+          }}>
             <RefreshCw size={16} />{loading ? 'Actualizando…' : 'Refrescar'}
           </button>
         </div>
@@ -52,6 +66,8 @@ export function WarRoomPage() {
         <div className="card"><span>Viewers totales</span><b>{liveTalents.reduce((s, t) => s + t.viewers, 0).toLocaleString('es-MX')}</b></div>
         <div className="card"><span>Tiempo real</span><b>{eventSub?.state === 'connected' ? 'Conectado' : eventSub?.state === 'connecting' ? 'Conectando' : eventSub?.state === 'fallback_polling' ? 'Modo alterno' : 'Desconectado'}</b></div>
       </div>
+
+      <ActiveUsersPanel />
 
       <p className="integration-note">
         Twitch: {helixStatus === 'connected' ? 'conectado' : helixStatus === 'connecting' ? 'conectando' : helixStatus === 'error' ? 'error' : 'pendiente'}

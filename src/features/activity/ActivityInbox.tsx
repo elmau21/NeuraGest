@@ -33,11 +33,22 @@ export function ActivityInbox() {
     return () => window.removeEventListener('click', close)
   }, [open])
 
+  const unread = items.length > 0
+
   return (
     <div className="activity-inbox-wrap" ref={wrapRef}>
-      <button className={open ? 'active' : ''} onClick={(event) => { event.stopPropagation(); setOpen((value) => !value) }}>
-        <Bell size={18}/>
-        {items.length > 0 && <i/>}
+      <button
+        type="button"
+        className={`activity-bell${open ? ' active' : ''}`}
+        aria-label={unread ? `Actividad (${items.length} recientes)` : 'Actividad'}
+        title="Actividad"
+        onClick={(event) => {
+          event.stopPropagation()
+          setOpen((value) => !value)
+        }}
+      >
+        <Bell size={16} strokeWidth={2} aria-hidden />
+        {unread && <span className="activity-unread" aria-hidden />}
       </button>
       {open && (
         <div className="activity-inbox card" onClick={(event) => event.stopPropagation()}>
@@ -50,7 +61,11 @@ export function ActivityInbox() {
               <div key={item.id} className="activity-row">
                 <span>{relativeTime(item.createdAt)}</span>
                 <p>{item.label}</p>
-                <small>{item.entityType}</small>
+                <small>
+                  {item.actorLogin
+                    ? `@${item.actorLogin}`
+                    : item.actorName ?? item.entityType}
+                </small>
               </div>
             ))}
             {items.length === 0 && <p className="empty-state">Sin actividad reciente.</p>}

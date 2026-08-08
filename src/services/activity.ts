@@ -1,5 +1,12 @@
 import { supabase, subscribeToActivity } from '@/services/supabase'
 import { DEFAULT_ORG_ID } from '@/services/org'
+import {
+  formatActivityLabel,
+  resolveActorLogin,
+  resolveActorName,
+  type ActivityActor,
+} from '@/services/activity-format'
+import { logActivity } from '@/services/activity-log'
 
 export type ActivityItem = {
   id: number
@@ -9,68 +16,87 @@ export type ActivityItem = {
   metadata: Record<string, unknown>
   createdAt: string
   label: string
+  actorName?: string
+  actorLogin?: string
 }
 
-function formatLabel(item: {
+type ActivityLogRow = {
+  id: number
   entity_type: string
+  entity_id: string | null
   action: string
   metadata: Record<string, unknown> | null
-}): string {
-  const meta = item.metadata ?? {}
-  const title = meta.title ? String(meta.title) : ''
-  switch (`${item.entity_type}.${item.action}`) {
-    case 'task.created': return `Nueva tarea: ${title || 'sin título'}`
-    case 'task.updated': return `Tarea actualizada${title ? `: ${title}` : ''}`
-    case 'task.commented': return `Comentario en tarea${meta.preview ? `: «${meta.preview}»` : ''}`
-    case 'document.wiki_created': return `Wiki creada: ${title}`
-    case 'calendar.created': return `Evento: ${title || meta.event_type || 'calendario'}`
-    case 'template.applied': return `Plantilla aplicada: ${meta.template || 'operaciones'}`
-    case 'role.updated': return `Roles actualizados para ${meta.login || 'usuario'}`
-    case 'role.granted': return `Rol otorgado: ${meta.login || 'usuario'}`
-    case 'role.revoked': return `Rol revocado: ${meta.login || 'usuario'}`
-    case 'contract.viewed': return `Contrato consultado: ${meta.fileName || title || 'documento'}`
-    case 'contract.downloaded': return `Contrato descargado: ${meta.fileName || title || 'documento'}`
-    case 'document.contract_sync': return `Contrato sincronizado: ${meta.fileName ?? title}`
-    case 'rate_card.created': return `Rate card: ${title || meta.label || 'tarifa nueva'}`
-    case 'rate_card.updated': return `Rate card actualizada: ${title || meta.label || ''}`
-    case 'brief.created': return `Brief creado: ${title || meta.brandName || 'campaña'}`
-    case 'brief.updated': return `Brief actualizado: ${title || ''}`
-    case 'asset.created': return `Asset subido: ${title || 'archivo'}`
-    case 'asset.updated': return `Asset actualizado: ${title || ''}`
-    case 'handoff.created': return `Handoff de turno registrado`
-    case 'handoff.updated': return `Handoff ${meta.status || 'actualizado'}`
-    case 'task.deleted': return `Tarea eliminada${title ? `: ${title}` : ''}`
-    case 'talent.live': return `${meta.displayName || 'Talento'} en vivo · ${meta.viewers ?? 0} viewers`
-    case 'ml.anomaly_detected': return `ML anomalía · ${meta.displayName || 'talento'} (${meta.direction}) z=${meta.zScore ?? '?'}`
-    case 'ml.regime_change': return `ML cambio régimen · ${meta.displayName || 'talento'} (${meta.direction})`
-    case 'ml.risk_task_created': return `Tarea ML creada: ${meta.title || 'seguimiento inactividad'}`
-    case 'ml.models_trained': return `Modelos ML entrenados · ${meta.modelCount ?? 0} (${meta.avgR2 ?? '?'})`
-    default:
-      return `${item.entity_type} · ${item.action}`
+  created_at: string | null
+  actor_id?: string | null
+  actor?: ActivityActor
+}
+
+const ACTIVITY_SELECT =
+  'id,entity_type,entity_id,action,metadata,created_at,actor_id,actor:users!activity_logs_actor_id_fkey(display_name)'
+
+async function enrichActorsFromDirectory(
+  rows: ActivityLogRow[],
+): Promise<Map<string, ActivityActor>> {
+  const directory = new Map<string, ActivityActor>()
+  if (!supabase) return directory
+
+  const ids = [...new Set(rows.map((row) => row.actor_id).filter((id): id is string => Boolean(id)))]
+  if (ids.length === 0) return directory
+
+  const { data, error } = await supabase.rpc('lookup_activity_actors', { p_ids: ids })
+  if (error || !data) return directory
+
+  for (const row of data as Array<{
+    auth_user_id: string
+    display_name: string | null
+    twitch_login: string | null
+  }>) {
+    directory.set(row.auth_user_id, {
+      display_name: row.display_name,
+      twitch_login: row.twitch_login,
+    })
   }
+  return directory
+}
+
+export function mapActivityRows(
+  rows: ActivityLogRow[],
+  actorDirectory?: Map<string, ActivityActor>,
+): ActivityItem[] {
+  return rows.map((row) => {
+    const metadata = (row.metadata ?? {}) as Record<string, unknown>
+    const fromDirectory = row.actor_id ? actorDirectory?.get(row.actor_id) : undefined
+    const actor = fromDirectory ?? row.actor
+    const actorName = resolveActorName(actor, metadata)
+    const actorLogin = resolveActorLogin(actor, metadata)
+    return {
+      id: row.id,
+      entityType: row.entity_type,
+      entityId: row.entity_id ?? undefined,
+      action: row.action,
+      metadata,
+      createdAt: row.created_at ?? new Date().toISOString(),
+      actorName,
+      actorLogin,
+      label: formatActivityLabel(row.entity_type, row.action, metadata, actorName),
+    }
+  })
+}
+
+async function loadActivityRows(rows: ActivityLogRow[]): Promise<ActivityItem[]> {
+  const directory = await enrichActorsFromDirectory(rows)
+  return mapActivityRows(rows, directory)
 }
 
 export async function fetchActivity(limit = 40): Promise<ActivityItem[]> {
   if (!supabase) return []
   const { data } = await supabase
     .from('activity_logs')
-    .select('id,entity_type,entity_id,action,metadata,created_at')
+    .select(ACTIVITY_SELECT)
     .eq('organization_id', DEFAULT_ORG_ID)
     .order('created_at', { ascending: false })
     .limit(limit)
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    entityType: row.entity_type,
-    entityId: row.entity_id ?? undefined,
-    action: row.action,
-    metadata: (row.metadata ?? {}) as Record<string, unknown>,
-    createdAt: row.created_at ?? new Date().toISOString(),
-    label: formatLabel({
-      entity_type: row.entity_type,
-      action: row.action,
-      metadata: row.metadata as Record<string, unknown> | null,
-    }),
-  }))
+  return loadActivityRows((data ?? []) as ActivityLogRow[])
 }
 
 export function watchActivity(onChange: () => void): () => void {
@@ -82,11 +108,8 @@ export function watchActivity(onChange: () => void): () => void {
 }
 
 export async function logTalentLive(displayName: string, viewers: number, login: string): Promise<void> {
-  if (!supabase) return
-  await supabase.rpc('log_activity', {
-    p_entity_type: 'talent',
-    p_entity_id: null,
-    p_action: 'live',
-    p_metadata: { displayName, viewers, login },
-  })
+  await logActivity('talent', 'live', { displayName, viewers, login })
 }
+
+export { ACTIVITY_SELECT, loadActivityRows }
+export type { ActivityLogRow }

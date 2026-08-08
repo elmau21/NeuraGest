@@ -11,6 +11,7 @@ import {
   type AgencyAsset,
 } from '@/services/assets'
 import { isTauri } from '@/services/twitch'
+import { logAssetActivity } from '@/services/audit'
 
 export function AssetsPage() {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -67,6 +68,7 @@ export function AssetsPage() {
       if (saved?.storagePath) {
         const url = await signedAssetUrl(saved.storagePath)
         setAssets((prev) => [{ ...saved, url }, ...prev])
+        void logAssetActivity('created', saved.title, saved.id)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -84,6 +86,7 @@ export function AssetsPage() {
         dealId: draft.dealId || undefined,
       })
       setAssets((prev) => [saved, ...prev])
+      void logAssetActivity('created', saved.title, saved.id)
       setLinkOpen(false)
       setDraft({ title: '', externalUrl: '', tags: '', talentId: '', dealId: '' })
     } catch (err) {
@@ -93,7 +96,9 @@ export function AssetsPage() {
 
   const remove = async (id: string) => {
     try {
+      const title = assets.find((a) => a.id === id)?.title ?? 'archivo'
       await deleteAgencyAsset(id)
+      void logAssetActivity('deleted', title, id)
       setAssets((prev) => prev.filter((a) => a.id !== id))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

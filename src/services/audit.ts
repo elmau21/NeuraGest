@@ -1,72 +1,80 @@
+import { logActivity } from '@/services/activity-log'
 import { supabase } from '@/services/supabase'
 import { DEFAULT_ORG_ID } from '@/services/org'
-import type { ActivityItem } from '@/services/activity'
-import { fetchActivity } from '@/services/activity'
+import {
+  ACTIVITY_SELECT,
+  fetchActivity,
+  loadActivityRows,
+  type ActivityItem,
+  type ActivityLogRow,
+} from '@/services/activity'
+import type { AppRole } from '@/services/app-users'
 
-export type AuditFilter = 'all' | 'roles' | 'contracts' | 'tasks'
+export type AuditFilter =
+  | 'all'
+  | 'roles'
+  | 'contracts'
+  | 'tasks'
+  | 'wiki'
+  | 'crm'
+  | 'session'
+  | 'ops'
+
+export type ContractActivityAction = 'viewed' | 'downloaded' | 'deleted' | 'uploaded'
 
 const AUDIT_ENTITY_TYPES: Record<Exclude<AuditFilter, 'all'>, string[]> = {
   roles: ['role', 'permission'],
-  contracts: ['document', 'contract'],
+  contracts: ['contract'],
   tasks: ['task'],
+  wiki: ['wiki', 'document'],
+  crm: ['crm', 'brief', 'rate_card', 'asset'],
+  session: ['session'],
+  ops: ['handoff', 'calendar', 'template', 'talent'],
+}
+
+/** Auditoría visible para roles operativos (no `dev`: solo datos/ML). */
+export function canViewAudit(roles: AppRole[]): boolean {
+  return roles.some((role) =>
+    role === 'owner' || role === 'admin' || role === 'manager',
+  )
 }
 
 export async function fetchAuditActivity(filter: AuditFilter = 'all', limit = 60): Promise<ActivityItem[]> {
   if (!supabase) return []
   if (filter === 'all') return fetchActivity(limit)
 
+  if (filter === 'wiki') {
+    const { data } = await supabase
+      .from('activity_logs')
+      .select(ACTIVITY_SELECT)
+      .eq('organization_id', DEFAULT_ORG_ID)
+      .or('entity_type.eq.wiki,and(entity_type.eq.document,action.like.wiki_%)')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    return loadActivityRows((data ?? []) as ActivityLogRow[])
+  }
+
   const types = AUDIT_ENTITY_TYPES[filter]
   const { data } = await supabase
     .from('activity_logs')
-    .select('id,entity_type,entity_id,action,metadata,created_at')
+    .select(ACTIVITY_SELECT)
     .eq('organization_id', DEFAULT_ORG_ID)
     .in('entity_type', types)
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  return (data ?? []).map((row) => {
-    const metadata = (row.metadata ?? {}) as Record<string, unknown>
-    return {
-      id: row.id,
-      entityType: row.entity_type,
-      entityId: row.entity_id ?? undefined,
-      action: row.action,
-      metadata,
-      createdAt: row.created_at ?? new Date().toISOString(),
-      label: formatAuditLabel(row.entity_type, row.action, metadata),
-    }
-  })
-}
-
-function formatAuditLabel(entityType: string, action: string, meta: Record<string, unknown>): string {
-  const title = meta.title ? String(meta.title) : ''
-  switch (`${entityType}.${action}`) {
-    case 'role.updated': return `Roles actualizados: ${meta.login ?? 'usuario'} → ${(meta.roles as string[] | undefined)?.join(', ') ?? ''}`
-    case 'role.granted': return `Rol otorgado a ${meta.login ?? 'usuario'}: ${meta.role ?? ''}`
-    case 'role.revoked': return `Rol revocado a ${meta.login ?? 'usuario'}: ${meta.role ?? ''}`
-    case 'contract.viewed': return `Contrato consultado: ${title || meta.fileName || 'documento'}`
-    case 'contract.downloaded': return `Contrato descargado: ${title || meta.fileName || 'documento'}`
-    case 'document.contract_sync': return `Contrato sincronizado: ${meta.fileName ?? title}`
-    case 'task.created': return `Tarea creada: ${title || 'sin título'}`
-    case 'task.updated': return `Tarea actualizada${title ? `: ${title}` : ''}`
-    case 'task.deleted': return `Tarea eliminada${title ? `: ${title}` : ''}`
-    case 'task.commented': return `Comentario en tarea${meta.preview ? `: «${meta.preview}»` : ''}`
-    case 'task.reassigned': return `Tarea reasignada: ${title || meta.taskId || ''}`
-    default: return `${entityType} · ${action}`
-  }
+  return loadActivityRows((data ?? []) as ActivityLogRow[])
 }
 
 export async function logContractActivity(
-  action: 'viewed' | 'downloaded',
+  action: ContractActivityAction,
   fileName: string,
   talentLogin?: string,
 ): Promise<void> {
-  if (!supabase) return
-  await supabase.rpc('log_activity', {
-    p_entity_type: 'contract',
-    p_entity_id: null,
-    p_action: action,
-    p_metadata: { fileName, talentLogin, title: fileName },
+  await logActivity('contract', action, {
+    fileName,
+    talentLogin,
+    title: fileName,
   })
 }
 
@@ -75,13 +83,51 @@ export async function logRoleActivity(
   roles: string[],
   previousRoles?: string[],
 ): Promise<void> {
-  if (!supabase) return
-  await supabase.rpc('log_activity', {
-    p_entity_type: 'role',
-    p_entity_id: null,
-    p_action: 'updated',
-    p_metadata: { login, roles, previousRoles },
-  })
+  await logActivity('role', 'updated', { login, roles, previousRoles })
+}
+
+export async function logAuthActivity(action: 'login' | 'logout'): Promise<void> {
+  await logActivity('session', action)
+}
+
+export async function logCrmDealActivity(
+  action: 'saved' | 'deleted',
+  brandName: string,
+  entityId?: string,
+): Promise<void> {
+  await logActivity('crm', action, { title: brandName, brandName }, entityId ?? null)
+}
+
+export async function logBriefActivity(
+  action: 'created' | 'updated' | 'deleted',
+  title: string,
+  entityId?: string,
+): Promise<void> {
+  await logActivity('brief', action, { title }, entityId ?? null)
+}
+
+export async function logRateCardActivity(
+  action: 'created' | 'updated' | 'deleted',
+  label: string,
+  entityId?: string,
+): Promise<void> {
+  await logActivity('rate_card', action, { title: label, label }, entityId ?? null)
+}
+
+export async function logAssetActivity(
+  action: 'created' | 'deleted',
+  title: string,
+  entityId?: string,
+): Promise<void> {
+  await logActivity('asset', action, { title }, entityId ?? null)
+}
+
+export async function logHandoffActivity(
+  action: 'created' | 'updated',
+  meta: { status?: string; talentLogin?: string },
+  entityId?: string,
+): Promise<void> {
+  await logActivity('handoff', action, meta, entityId ?? null)
 }
 
 export const AUDIT_FILTER_LABELS: Record<AuditFilter, string> = {
@@ -89,4 +135,8 @@ export const AUDIT_FILTER_LABELS: Record<AuditFilter, string> = {
   roles: 'Roles / permisos',
   contracts: 'Contratos',
   tasks: 'Tareas',
+  wiki: 'Wiki',
+  crm: 'CRM / campañas',
+  session: 'Sesiones',
+  ops: 'Ops / calendario',
 }

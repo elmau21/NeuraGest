@@ -20,6 +20,8 @@ import {
   type TwitchUserProfile,
 } from '@/services/twitch'
 import { humanizeInvokeError } from '@/lib/humanize-error'
+import { logAuthActivity } from '@/services/audit'
+import { clearOrgPresence } from '@/services/org-presence'
 
 export type AuthStatus = 'checking' | 'authenticated' | 'unauthenticated'
 export type OAuthFlowPhase = 'idle' | 'opening' | 'waiting' | 'success' | 'error'
@@ -175,15 +177,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         status: 'unauthenticated',
         session: null,
         oauthFlow: 'idle',
+        error: null,
         roles: [],
         appUserId: null,
         canAdmin: false,
       })
-    } catch (error) {
+    } catch {
       set({
         status: 'unauthenticated',
         session: null,
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          'No pudimos recuperar tu sesión. Vuelve a iniciar sesión; se guardará al cerrar la app.',
         roles: [],
         appUserId: null,
         canAdmin: false,
@@ -210,6 +214,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         error: null,
         ...identity,
       })
+      void logAuthActivity('login')
     } catch (error) {
       set({
         oauthFlow: 'error',
@@ -225,6 +230,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: async () => {
     try {
+      await logAuthActivity('logout')
+      await clearOrgPresence()
       await signOutSupabase()
       await disconnectTwitch()
     } catch (error) {

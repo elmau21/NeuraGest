@@ -1,5 +1,6 @@
 import { supabase } from '@/services/supabase'
 import { DEFAULT_ORG_ID } from '@/services/org'
+import { logActivity } from '@/services/activity-log'
 import type { CalendarItem } from '@/types'
 
 export type CalendarEventRecord = CalendarItem & {
@@ -54,12 +55,12 @@ export async function createCalendarEvent(input: {
     .select('id,title,description,event_type,starts_at,ends_at,all_day')
     .single()
   if (error || !data) return null
-  await supabase.rpc('log_activity', {
-    p_entity_type: 'calendar',
-    p_entity_id: data.id,
-    p_action: 'created',
-    p_metadata: { title: data.title, event_type: data.event_type },
-  })
+  await logActivity(
+    'calendar',
+    'created',
+    { title: data.title, event_type: data.event_type },
+    data.id,
+  )
   const starts = new Date(data.starts_at)
   return {
     id: data.id,

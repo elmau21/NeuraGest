@@ -6,8 +6,8 @@ import {
   TASK_PRIORITY_IDS,
   TASK_STATUS_IDS,
 } from '@/services/org'
+import { logActivity } from '@/services/activity-log'
 import type { Priority, TaskStatus } from '@/types'
-import type { Json } from '@/types/supabase'
 
 export type TaskRecord = {
   id: string
@@ -85,6 +85,7 @@ export async function createTask(input: Partial<TaskRecord>): Promise<TaskRecord
   if (!supabase) return null
   const status = input.status ?? 'backlog'
   const priority = input.priority ?? 'medium'
+  const { data: { user } } = await supabase.auth.getUser()
   const { data, error } = await supabase
     .from('tasks')
     .insert({
@@ -97,17 +98,13 @@ export async function createTask(input: Partial<TaskRecord>): Promise<TaskRecord
       starts_at: input.startsAt ? new Date(input.startsAt).toISOString() : null,
       estimate_minutes: Math.round((input.estimate ?? 1) * 60),
       position: input.position ?? Date.now(),
+      created_by: user?.id ?? null,
     })
     .select('id,title,description,status_id,priority_id,due_at,starts_at,estimate_minutes,position')
     .single()
   if (error || !data) return null
   const task = mapTask(data as Record<string, unknown>)
-  await supabase.rpc('log_activity', {
-    p_entity_type: 'task',
-    p_entity_id: task.id,
-    p_action: 'created',
-    p_metadata: { title: task.title },
-  })
+  await logActivity('task', 'created', { title: task.title }, task.id)
   return task
 }
 
@@ -133,12 +130,17 @@ export async function updateTask(id: string, patch: Partial<TaskRecord>): Promis
   if (patch.position !== undefined) payload.position = patch.position
   const { error } = await supabase.from('tasks').update(payload).eq('id', id)
   if (!error) {
-    await supabase.rpc('log_activity', {
-      p_entity_type: 'task',
-      p_entity_id: id,
-      p_action: 'updated',
-      p_metadata: patch as Json,
-    })
+    const action = patch.status === 'done' ? 'completed' : 'updated'
+    await logActivity(
+      'task',
+      action,
+      {
+        title: patch.title,
+        status: patch.status,
+        priority: patch.priority,
+      },
+      id,
+    )
   }
   return !error
 }
@@ -161,12 +163,7 @@ export async function deleteTask(id: string): Promise<TaskMutationResult> {
     .maybeSingle()
   if (error) return { ok: false, error: error.message }
   if (!data) return { ok: false, error: 'No se pudo eliminar la tarea (permisos o tarea inexistente)' }
-  await supabase.rpc('log_activity', {
-    p_entity_type: 'task',
-    p_entity_id: id,
-    p_action: 'deleted',
-    p_metadata: { deleted_at: deletedAt },
-  })
+  await logActivity('task', 'deleted', { deleted_at: deletedAt }, id)
   return { ok: true }
 }
 
@@ -235,12 +232,7 @@ export async function addComment(taskId: string, body: string): Promise<CommentR
     .select('id,task_id,body,created_at')
     .single()
   if (error || !data) return null
-  await supabase.rpc('log_activity', {
-    p_entity_type: 'task',
-    p_entity_id: taskId,
-    p_action: 'commented',
-    p_metadata: { preview: body.slice(0, 80) },
-  })
+  await logActivity('task', 'commented', { preview: body.slice(0, 80) }, taskId)
   return {
     id: data.id,
     taskId: data.task_id ?? taskId,

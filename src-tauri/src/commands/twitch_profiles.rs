@@ -74,7 +74,7 @@ fn env_default_profile() -> Option<HelixProfile> {
     let client_id = std::env::var("TWITCH_CLIENT_ID").ok()?;
     Some(HelixProfile {
         id: DEFAULT_PROFILE_ID.into(),
-        name: "Entorno (.env)".into(),
+        name: "Cuenta de la agencia".into(),
         client_id,
         has_secret: std::env::var("TWITCH_CLIENT_SECRET").is_ok(),
     })
@@ -137,6 +137,17 @@ pub async fn list_helix_profiles(app: tauri::AppHandle) -> Result<Vec<HelixProfi
         if let Some(default) = env_default_profile() {
             store.profiles.push(default);
             store.active_id = Some(DEFAULT_PROFILE_ID.into());
+        }
+    } else if let Some(default) = env_default_profile() {
+        // Refresh display name / secret flag for the baked-in agency profile.
+        if let Some(existing) = store
+            .profiles
+            .iter_mut()
+            .find(|p| p.id == DEFAULT_PROFILE_ID)
+        {
+            existing.name = default.name;
+            existing.client_id = default.client_id;
+            existing.has_secret = default.has_secret;
         }
     }
     *cache().write().await = store.clone();
@@ -207,7 +218,7 @@ pub async fn save_helix_profile(
 #[tauri::command]
 pub async fn delete_helix_profile(app: tauri::AppHandle, id: String) -> Result<(), String> {
     if id == DEFAULT_PROFILE_ID {
-        return Err("No se puede eliminar el perfil por defecto del entorno.".into());
+        return Err("No se puede eliminar la cuenta de la agencia.".into());
     }
     let mut store = load_store(&app).await?;
     store.profiles.retain(|p| p.id != id);

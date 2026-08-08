@@ -1690,6 +1690,14 @@ export type Database = {
         }
         Returns: number
       }
+      lookup_activity_actors: {
+        Args: { p_ids: string[] }
+        Returns: {
+          auth_user_id: string
+          display_name: string | null
+          twitch_login: string | null
+        }[]
+      }
       sync_auth_user_from_app: {
         Args: { p_auth_user_id: string; p_org_id?: string }
         Returns: undefined

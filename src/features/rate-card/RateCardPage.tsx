@@ -13,6 +13,7 @@ import {
 } from '@/services/rate-card'
 import { useAppStore } from '@/stores/app-store'
 import { isTauri } from '@/services/twitch'
+import { logRateCardActivity } from '@/services/audit'
 
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 
@@ -86,6 +87,7 @@ export function RateCardPage() {
         const filtered = prev.filter((i) => i.id !== saved.id)
         return [saved, ...filtered]
       })
+      void logRateCardActivity(draft.id ? 'updated' : 'created', saved.label, saved.id)
       setEditorOpen(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -94,7 +96,9 @@ export function RateCardPage() {
 
   const remove = async (id: string) => {
     try {
+      const label = items.find((i) => i.id === id)?.label ?? 'tarifa'
       await deleteRateCard(id)
+      void logRateCardActivity('deleted', label, id)
       setItems((prev) => prev.filter((i) => i.id !== id))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

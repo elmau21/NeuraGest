@@ -5,6 +5,7 @@ import { OAuthWaitingPanel } from '@/features/auth/OAuthWaitingPanel'
 import { neuraliveLogotype } from '@/assets/brand'
 import { useAuthStore } from '@/stores/auth-store'
 import { isTauri } from '@/services/twitch'
+import { toastError } from '@/stores/toast-store'
 
 export function LoginScreen() {
   const oauthFlow = useAuthStore((s) => s.oauthFlow)
@@ -21,6 +22,13 @@ export function LoginScreen() {
       return () => window.clearTimeout(timer)
     }
   }, [oauthFlow, cancelOAuthFlow])
+
+  useEffect(() => {
+    if (!error) return
+    if (oauthFlow === 'idle' || oauthFlow === 'error') {
+      toastError('No se pudo iniciar sesión. Inténtalo de nuevo.')
+    }
+  }, [error, oauthFlow])
 
   return (
     <div className="auth-screen">
@@ -81,8 +89,8 @@ export function LoginScreen() {
               <p className="auth-note auth-note--error">{error}</p>
             )}
             <p className="auth-note">
-              NeuraGest inicia sesión con tu cuenta Twitch de forma segura. Tus credenciales se guardan en
-              Windows Credential Manager.
+              NeuraGest inicia sesión con tu cuenta Twitch de forma segura. La sesión se guarda en este
+              equipo y se restaura al volver a abrir la app.
             </p>
           </motion.div>
         ) : (

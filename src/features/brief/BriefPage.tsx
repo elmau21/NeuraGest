@@ -11,6 +11,7 @@ import {
   type CampaignBrief,
 } from '@/services/brief'
 import { isTauri } from '@/services/twitch'
+import { logBriefActivity } from '@/services/audit'
 
 export function BriefPage() {
   const [briefs, setBriefs] = useState<CampaignBrief[]>([])
@@ -70,6 +71,7 @@ export function BriefPage() {
         extraNotes: draft.extraNotes,
       })
       setBriefs((prev) => [saved, ...prev.filter((b) => b.id !== saved.id)])
+      void logBriefActivity(draft.id ? 'updated' : 'created', saved.title, saved.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }
@@ -77,7 +79,9 @@ export function BriefPage() {
 
   const remove = async (id: string) => {
     try {
+      const title = briefs.find((b) => b.id === id)?.title ?? 'campaña'
       await deleteCampaignBrief(id)
+      void logBriefActivity('deleted', title, id)
       setBriefs((prev) => prev.filter((b) => b.id !== id))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

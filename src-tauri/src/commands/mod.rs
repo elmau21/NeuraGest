@@ -1,4 +1,5 @@
 pub mod agency_bridge;
+pub mod discord_rpc;
 pub mod google_calendar;
 pub mod oauth_callback;
 pub mod ops_bridge;
