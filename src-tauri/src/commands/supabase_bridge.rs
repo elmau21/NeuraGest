@@ -9,11 +9,13 @@ pub(crate) const DEFAULT_ORG_ID: &str = "00000000-0000-0000-0000-000000000001";
 const PROTECTED_LOGIN: &str = "maufuwari";
 const SYNTHETIC_TWITCH_EMAIL_DOMAIN: &str = "twitch.neuragest.local";
 const ADMIN_ROLES: [&str; 2] = ["owner", "dev"];
-const ALL_ROLES: [&str; 10] = [
+const ROLE_MANAGER_ROLES: [&str; 3] = ["owner", "dev", "assistant"];
+const ALL_ROLES: [&str; 11] = [
     "owner",
     "admin",
     "manager",
     "staff",
+    "assistant",
     "dev",
     "designer",
     "league_manager",
@@ -330,13 +332,22 @@ fn urlencoding(value: &str) -> String {
     url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
 }
 
-async fn require_admin(login: &str) -> Result<(), String> {
+async fn require_role_manager(login: &str) -> Result<(), String> {
     let roles = roles_for_login(login).await?;
-    if roles.iter().any(|role| ADMIN_ROLES.contains(&role.as_str())) {
+    if roles
+        .iter()
+        .any(|role| ROLE_MANAGER_ROLES.contains(&role.as_str()))
+    {
         Ok(())
     } else {
-        Err("No tienes permisos owner/dev para administrar roles.".into())
+        Err("No tienes permisos para administrar roles.".into())
     }
+}
+
+fn caller_is_owner_or_dev(roles: &[String]) -> bool {
+    roles
+        .iter()
+        .any(|role| ADMIN_ROLES.contains(&role.as_str()))
 }
 
 async fn count_owners_excluding(exclude_user_id: Option<&str>) -> Result<i64, String> {
@@ -440,7 +451,7 @@ pub async fn fetch_my_roles() -> Result<Vec<String>, String> {
 #[tauri::command]
 pub async fn list_app_users() -> Result<Vec<AppUserRecord>, String> {
     let (_, login) = caller_login().await?;
-    require_admin(&login.to_lowercase()).await?;
+    require_role_manager(&login.to_lowercase()).await?;
 
     let response = supabase_request(
         Method::GET,
@@ -476,7 +487,7 @@ pub async fn set_app_user_roles(
     confirm_protected: bool,
 ) -> Result<Vec<String>, String> {
     let (_, caller) = caller_login().await?;
-    require_admin(&caller.to_lowercase()).await?;
+    require_role_manager(&caller.to_lowercase()).await?;
 
     for role in &roles {
         if !ALL_ROLES.contains(&role.as_str()) {
@@ -496,21 +507,33 @@ pub async fn set_app_user_roles(
         }
     }
 
+    let caller_roles = roles_for_login(&caller.to_lowercase()).await?;
+    let caller_is_owner = caller_roles.iter().any(|role| role == "owner");
+    let caller_elevated = caller_is_owner_or_dev(&caller_roles);
+
+    if next_has_owner && !caller_is_owner {
+        return Err("Solo un owner puede asignar el rol owner.".into());
+    }
+    if current_has_owner && !next_has_owner && !caller_is_owner {
+        return Err("Solo un owner puede quitar el rol owner.".into());
+    }
+
     let is_protected = target.twitch_login.eq_ignore_ascii_case(PROTECTED_LOGIN);
     if is_protected {
         let losing_admin = ADMIN_ROLES.iter().any(|role| current_roles.iter().any(|r| r == role))
             && !ADMIN_ROLES.iter().any(|role| roles.iter().any(|r| r == role));
-        if losing_admin && !confirm_protected {
-            return Err(
-                "MauFuwari requiere confirmación explícita para degradar roles owner/dev.".into(),
-            );
+        if losing_admin {
+            if !caller_elevated {
+                return Err(
+                    "No puedes degradar roles owner/dev de MauFuwari.".into(),
+                );
+            }
+            if !confirm_protected {
+                return Err(
+                    "MauFuwari requiere confirmación explícita para degradar roles owner/dev.".into(),
+                );
+            }
         }
-    }
-
-    let caller_roles = roles_for_login(&caller.to_lowercase()).await?;
-    let caller_is_owner = caller_roles.iter().any(|role| role == "owner");
-    if roles.iter().any(|role| role == "owner") && !caller_is_owner {
-        return Err("Solo un owner puede asignar el rol owner.".into());
     }
 
     supabase_request(

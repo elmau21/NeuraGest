@@ -7,8 +7,9 @@ import {
   setActiveHelixProfile,
   type HelixProfile,
 } from '@/services/helix-profiles'
-import { useAuthStore } from '@/stores/auth-store'
 import { canMutate } from '@/services/permissions'
+import { canAdminMutate } from '@/services/permissions'
+import { useAuthStore } from '@/stores/auth-store'
 import { useAppStore } from '@/stores/app-store'
 
 const AGENCY_PROFILE_ID = 'env-default'
@@ -26,7 +27,9 @@ export function TwitchHelixSettings() {
   const roles = useAuthStore((s) => s.roles)
   const session = useAuthStore((s) => s.session)
   const refreshTalentData = useAppStore((s) => s.refreshTalentData)
-  const readonly = !canMutate(roles, session?.login)
+  /** Rotar / borrar secretos Helix: solo owner/admin/dev. */
+  const readonly = !canAdminMutate(roles, session?.login)
+  const canSwitch = canMutate(roles, session?.login)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -48,7 +51,7 @@ export function TwitchHelixSettings() {
   useEffect(() => { void reload() }, [reload])
 
   const activate = async (id: string) => {
-    if (readonly) return
+    if (!canSwitch) return
     try {
       await setActiveHelixProfile(id)
       setActiveId(id)
@@ -86,7 +89,7 @@ export function TwitchHelixSettings() {
               </div>
               <div className="helix-profile-actions">
                 {profile.id !== activeId && (
-                  <button className="secondary" disabled={readonly || loading} onClick={() => void activate(profile.id)}>
+                  <button className="secondary" disabled={!canSwitch || loading} onClick={() => void activate(profile.id)}>
                     Usar
                   </button>
                 )}

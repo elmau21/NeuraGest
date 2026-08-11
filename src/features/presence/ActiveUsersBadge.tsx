@@ -8,6 +8,8 @@ import { useAuthStore } from '@/stores/auth-store'
 
 const PAGE_LABELS: Record<string, string> = {
   '/': 'Dashboard',
+  '/control': 'Centro de control',
+  '/asistente': 'Centro de control',
   '/war-room': 'War Room',
   '/talentos': 'Talentos',
   '/pipeline': 'Pipeline',

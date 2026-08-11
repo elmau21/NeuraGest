@@ -1,20 +1,28 @@
 import type { AppRole } from '@/services/app-users'
+import { ROLE_MANAGER_ROLES } from '@/services/app-users'
 
-export const MUTATE_ROLES: AppRole[] = ['owner', 'admin', 'manager', 'dev']
+export const MUTATE_ROLES: AppRole[] = ['owner', 'admin', 'manager', 'assistant', 'dev']
 export const ADMIN_MUTATE_ROLES: AppRole[] = ['owner', 'admin', 'dev']
-export const DESIGN_MUTATE_ROLES: AppRole[] = ['owner', 'admin', 'manager', 'dev', 'designer']
+export const DESIGN_MUTATE_ROLES: AppRole[] = ['owner', 'admin', 'manager', 'assistant', 'dev', 'designer']
 export const LEAGUE_ROLES: AppRole[] = ['league_manager', 'coach', 'analyst', 'player']
 export const LEAGUE_MUTATE_ROLES: AppRole[] = [
   'owner',
   'admin',
   'manager',
+  'assistant',
   'league_manager',
   'coach',
   'analyst',
 ]
 
 /** Roles con navegación completa (prioridad sobre roles restringidos). */
-export const FULL_NAV_ROLES: AppRole[] = ['owner', 'admin', 'manager', 'staff']
+export const FULL_NAV_ROLES: AppRole[] = ['owner', 'admin', 'manager', 'staff', 'assistant']
+
+/** Quién ve el item «Centro de control» en el sidebar. */
+export const CONTROL_CENTER_ROLES: AppRole[] = ['owner', 'admin', 'manager', 'assistant']
+
+export const CONTROL_CENTER_PATH = '/control'
+export const CONTROL_CENTER_ALIAS_PATH = '/asistente'
 
 /** Rutas de datos permitidas para un usuario solo-`dev`. */
 export const DEV_ALLOWED_PATHS = [
@@ -45,6 +53,12 @@ export function canMutate(roles: AppRole[], login?: string | null): boolean {
   return roles.some((role) => MUTATE_ROLES.includes(role))
 }
 
+/** Mutaciones solo-admin/owner (secretos Helix, CRM crítico, etc.). */
+export function canAdminMutate(roles: AppRole[], login?: string | null): boolean {
+  if (login?.toLowerCase() === 'maufuwari') return true
+  return roles.some((role) => ADMIN_MUTATE_ROLES.includes(role))
+}
+
 /** Escritura en Drive creativo, briefs y huecos de canal. */
 export function canMutateDesign(roles: AppRole[], login?: string | null): boolean {
   if (login?.toLowerCase() === 'maufuwari') return true
@@ -58,8 +72,7 @@ export function canMutateLeague(roles: AppRole[], login?: string | null): boolea
 }
 
 export function canMutateCrm(roles: AppRole[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
-  return roles.some((role) => ADMIN_MUTATE_ROLES.includes(role))
+  return canAdminMutate(roles, login)
 }
 
 export function canMutateWiki(roles: AppRole[], login?: string | null): boolean {
@@ -80,7 +93,24 @@ export function hasFullNavAccess(roles: AppRole[], login?: string | null): boole
   return roles.some((role) => FULL_NAV_ROLES.includes(role))
 }
 
-/** Solo `dev` sin owner/admin/manager/staff → menú de datos restringido. */
+export function canAccessControlCenter(roles: AppRole[], login?: string | null): boolean {
+  if (login?.toLowerCase() === 'maufuwari') return true
+  return roles.some((role) => CONTROL_CENTER_ROLES.includes(role))
+}
+
+/** Panel de permisos / listado de usuarios (owner, dev, assistant). */
+export function canManageAppRoles(roles: AppRole[], login?: string | null): boolean {
+  if (login?.toLowerCase() === 'maufuwari') return true
+  return roles.some((role) => ROLE_MANAGER_ROLES.includes(role))
+}
+
+/** Solo un owner (o MauFuwari) puede asignar/quitar el rol owner. */
+export function canAssignOwnerRole(roles: AppRole[], login?: string | null): boolean {
+  if (login?.toLowerCase() === 'maufuwari') return true
+  return roles.includes('owner')
+}
+
+/** Solo `dev` sin owner/admin/manager/staff/assistant → menú de datos restringido. */
 export function isDevOnlyNav(roles: AppRole[], login?: string | null): boolean {
   if (hasFullNavAccess(roles, login)) return false
   return roles.includes('dev') && !roles.includes('designer') && !hasAnyLeagueRole(roles)
@@ -131,10 +161,13 @@ function pathAllowed(path: string, allowed: readonly string[]): boolean {
 }
 
 export function canAccessPath(roles: AppRole[], pathname: string, login?: string | null): boolean {
+  const path = normalizeAppPath(pathname)
+  if (path === CONTROL_CENTER_PATH || path === CONTROL_CENTER_ALIAS_PATH || path.startsWith(`${CONTROL_CENTER_PATH}/`)) {
+    return canAccessControlCenter(roles, login)
+  }
   if (hasFullNavAccess(roles, login)) return true
   if (!isRestrictedNav(roles, login)) return true
 
-  const path = normalizeAppPath(pathname)
   const allowed: string[] = []
   if (roles.includes('designer')) allowed.push(...DESIGNER_ALLOWED_PATHS)
   if (roles.includes('dev')) allowed.push(...DEV_ALLOWED_PATHS)
@@ -143,6 +176,8 @@ export function canAccessPath(roles: AppRole[], pathname: string, login?: string
 }
 
 export function defaultPathForRoles(roles: AppRole[], login?: string | null): string {
+  if (login?.toLowerCase() === 'maufuwari') return '/'
+  if (roles.includes('assistant') && !roles.includes('owner')) return CONTROL_CENTER_PATH
   if (hasFullNavAccess(roles, login)) return '/'
   if (roles.includes('designer')) return DESIGNER_DEFAULT_PATH
   if (hasAnyLeagueRole(roles)) return LEAGUE_DEFAULT_PATH

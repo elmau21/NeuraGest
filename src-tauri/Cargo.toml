@@ -1,6 +1,6 @@
 [package]
 name = "neuragest"
-version = "1.0.2"
+version = "1.0.3"
 description = "NeuraGest — gestión profesional de talentos Twitch"
 authors = ["NeuraLive"]
 license = "Proprietary"

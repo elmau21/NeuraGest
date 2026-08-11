@@ -8,7 +8,9 @@ import {
   setAppUserRoles,
 } from '@/services/app-users'
 import { logRoleActivity } from '@/services/audit'
+import { canAssignOwnerRole } from '@/services/permissions'
 import { useAuthStore } from '@/stores/auth-store'
+import { toastError, toastSuccess } from '@/stores/toast-store'
 
 function roleLabel(role: AppRole): string {
   const labels: Record<AppRole, string> = {
@@ -16,6 +18,7 @@ function roleLabel(role: AppRole): string {
     admin: 'Admin',
     manager: 'Manager',
     staff: 'Staff',
+    assistant: 'Asistente',
     dev: 'Dev',
     designer: 'Diseñador',
     league_manager: 'Manager Liga',
@@ -26,12 +29,23 @@ function roleLabel(role: AppRole): string {
   return labels[role]
 }
 
-export function PermissionsPanel() {
+type PermissionsPanelProps = {
+  /** Si true, oculta el encabezado largo (útil en Centro de control). */
+  compact?: boolean
+  /** Filtra chips visibles (p. ej. sin owner). */
+  hideRoles?: AppRole[]
+}
+
+export function PermissionsPanel({ compact = false, hideRoles = [] }: PermissionsPanelProps) {
   const session = useAuthStore((s) => s.session)
+  const actorRoles = useAuthStore((s) => s.roles)
+  const canAssignOwner = canAssignOwnerRole(actorRoles, session?.login)
   const [users, setUsers] = useState<AppUserRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyUserId, setBusyUserId] = useState<string | null>(null)
+
+  const visibleRoles = ALL_APP_ROLES.filter((role) => !hideRoles.includes(role))
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -55,10 +69,23 @@ export function PermissionsPanel() {
       ? user.roles.filter((item) => item !== role)
       : [...user.roles, role]
 
+    if (role === 'owner' && !canAssignOwner) {
+      toastError('Solo un owner puede asignar o quitar el rol Owner')
+      return
+    }
+
     const isProtected = user.twitchLogin.toLowerCase() === 'maufuwari'
     const losingAdmin = isProtected && hasRole && (role === 'owner' || role === 'dev')
     let confirmProtected = false
     if (losingAdmin) {
+      if (!canAssignOwner && role === 'owner') {
+        toastError('No puedes degradar el owner de MauFuwari')
+        return
+      }
+      if (!actorRoles.includes('owner') && !actorRoles.includes('dev') && session?.login?.toLowerCase() !== 'maufuwari') {
+        toastError('No puedes degradar roles owner/dev de MauFuwari')
+        return
+      }
       const ok = window.confirm(
         'MauFuwari perderá privilegios owner/dev. ¿Confirmas esta degradación?',
       )
@@ -74,24 +101,36 @@ export function PermissionsPanel() {
         current.map((item) => (item.id === user.id ? { ...item, roles: updated } : item)),
       )
       void logRoleActivity(user.twitchLogin, updated, user.roles)
+      toastSuccess(`Roles de @${user.twitchLogin} actualizados`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      const message = err instanceof Error ? err.message : String(err)
+      setError(message)
+      toastError(message)
     } finally {
       setBusyUserId(null)
     }
   }
 
   return (
-    <div className="permissions-panel">
-      <div className="permissions-head">
-        <div>
-          <h3><Shield size={16}/> Administración de permisos</h3>
-          <p>Gestiona roles owner, dev, admin, manager, staff y diseñador para cuentas Twitch registradas.</p>
+    <div className={`permissions-panel${compact ? ' permissions-panel-compact' : ''}`}>
+      {!compact && (
+        <div className="permissions-head">
+          <div>
+            <h3><Shield size={16}/> Administración de permisos</h3>
+            <p>Gestiona roles (Owner, Asistente, Manager, Staff, Diseño, Liga…) para cuentas Twitch registradas.</p>
+          </div>
+          <button className="secondary" disabled={loading} onClick={() => void load()}>
+            <RefreshCw size={14}/> Actualizar
+          </button>
         </div>
-        <button className="secondary" disabled={loading} onClick={() => void load()}>
-          <RefreshCw size={14}/> Actualizar
-        </button>
-      </div>
+      )}
+      {compact && (
+        <div className="permissions-head permissions-head-compact">
+          <button className="secondary" disabled={loading} onClick={() => void load()}>
+            <RefreshCw size={14}/> Actualizar
+          </button>
+        </div>
+      )}
 
       {error && <p className="integration-note permissions-error"><AlertTriangle size={13}/> {error}</p>}
 
@@ -123,15 +162,22 @@ export function PermissionsPanel() {
                 </div>
               </div>
               <div className="permissions-roles">
-                {ALL_APP_ROLES.map((role) => {
+                {visibleRoles.map((role) => {
                   const active = user.roles.includes(role)
+                  const ownerLocked = role === 'owner' && !canAssignOwner
                   return (
                     <button
                       key={role}
                       className={`role-chip ${active ? 'active' : ''}`}
-                      disabled={busyUserId === user.id}
+                      disabled={busyUserId === user.id || ownerLocked}
                       onClick={() => void toggleRole(user, role)}
-                      title={active ? `Quitar ${roleLabel(role)}` : `Asignar ${roleLabel(role)}`}
+                      title={
+                        ownerLocked
+                          ? 'Solo un owner puede gestionar este rol'
+                          : active
+                            ? `Quitar ${roleLabel(role)}`
+                            : `Asignar ${roleLabel(role)}`
+                      }
                     >
                       {roleLabel(role)}
                     </button>
@@ -139,7 +185,10 @@ export function PermissionsPanel() {
                 })}
               </div>
               <span className="permissions-seen">
-                {new Date(user.lastSeenAt).toLocaleString()}
+                {new Date(user.lastSeenAt).toLocaleString('es-MX', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                })}
               </span>
             </div>
           ))}

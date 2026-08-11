@@ -35,7 +35,7 @@ const AUDIT_ENTITY_TYPES: Record<Exclude<AuditFilter, 'all'>, string[]> = {
 /** Auditoría visible para roles operativos (no `dev`: solo datos/ML). */
 export function canViewAudit(roles: AppRole[]): boolean {
   return roles.some((role) =>
-    role === 'owner' || role === 'admin' || role === 'manager',
+    role === 'owner' || role === 'admin' || role === 'manager' || role === 'assistant',
   )
 }
 

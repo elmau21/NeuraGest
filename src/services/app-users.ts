@@ -6,6 +6,7 @@ export type AppRole =
   | 'admin'
   | 'manager'
   | 'staff'
+  | 'assistant'
   | 'dev'
   | 'designer'
   | 'league_manager'
@@ -18,6 +19,7 @@ export const ALL_APP_ROLES: AppRole[] = [
   'admin',
   'manager',
   'staff',
+  'assistant',
   'dev',
   'designer',
   'league_manager',
@@ -26,6 +28,8 @@ export const ALL_APP_ROLES: AppRole[] = [
   'player',
 ]
 export const ADMIN_ROLES: AppRole[] = ['owner', 'dev']
+/** Pueden abrir el panel de permisos y mutar roles (con límites por rol). */
+export const ROLE_MANAGER_ROLES: AppRole[] = ['owner', 'dev', 'assistant']
 
 export type AppUserRecord = {
   id: string

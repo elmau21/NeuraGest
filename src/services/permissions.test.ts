@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canAccessControlCenter,
   canAccessPath,
+  canAdminMutate,
+  canAssignOwnerRole,
   canEditPersonalSettings,
+  canManageAppRoles,
+  canMutate,
   canMutateDesign,
   canMutateLeague,
+  CONTROL_CENTER_PATH,
   defaultPathForRoles,
   DESIGNER_ALLOWED_PATHS,
   DESIGNER_DEFAULT_PATH,
@@ -18,6 +24,7 @@ import {
   LEAGUE_ALLOWED_PATHS,
   LEAGUE_DEFAULT_PATH,
 } from './permissions'
+import { canViewAudit } from './audit'
 
 describe('nav por rol', () => {
   it('owner+dev tiene navegación completa (prioridad owner)', () => {
@@ -142,5 +149,37 @@ describe('nav por rol', () => {
     expect(canAccessPath(['designer', 'player'], '/ajustes')).toBe(true)
     expect(canAccessPath(['designer', 'player'], '/crm')).toBe(false)
     expect(defaultPathForRoles(['designer', 'player'])).toBe(DESIGNER_DEFAULT_PATH)
+  })
+
+  it('assistant: full nav, centro de control, muta como manager; no admin-mutate', () => {
+    expect(hasFullNavAccess(['assistant'])).toBe(true)
+    expect(isDevOnlyNav(['assistant'])).toBe(false)
+    expect(isDesignerOnlyNav(['assistant'])).toBe(false)
+    expect(isLeagueOnlyNav(['assistant'])).toBe(false)
+    expect(isRestrictedNav(['assistant'])).toBe(false)
+    expect(canAccessPath(['assistant'], '/crm')).toBe(true)
+    expect(canAccessPath(['assistant'], '/auditoria')).toBe(true)
+    expect(canAccessPath(['assistant'], '/diseno')).toBe(true)
+    expect(canAccessPath(['assistant'], '/neuralleague')).toBe(true)
+    expect(canAccessPath(['assistant'], CONTROL_CENTER_PATH)).toBe(true)
+    expect(canAccessPath(['assistant'], '/asistente')).toBe(true)
+    expect(defaultPathForRoles(['assistant'])).toBe(CONTROL_CENTER_PATH)
+    expect(defaultPathForRoles(['assistant', 'owner'])).toBe('/')
+    expect(canMutate(['assistant'])).toBe(true)
+    expect(canMutateDesign(['assistant'])).toBe(true)
+    expect(canMutateLeague(['assistant'])).toBe(true)
+    expect(canAdminMutate(['assistant'])).toBe(false)
+    expect(canManageAppRoles(['assistant'])).toBe(true)
+    expect(canAssignOwnerRole(['assistant'])).toBe(false)
+    expect(canAssignOwnerRole(['owner'])).toBe(true)
+    expect(canViewAudit(['assistant'])).toBe(true)
+    expect(canAccessControlCenter(['assistant'])).toBe(true)
+    expect(canAccessControlCenter(['owner'])).toBe(true)
+    expect(canAccessControlCenter(['admin'])).toBe(true)
+    expect(canAccessControlCenter(['manager'])).toBe(true)
+    expect(canAccessControlCenter(['staff'])).toBe(false)
+    expect(canAccessControlCenter(['designer'])).toBe(false)
+    expect(canAccessPath(['staff'], CONTROL_CENTER_PATH)).toBe(false)
+    expect(canAccessPath(['designer'], CONTROL_CENTER_PATH)).toBe(false)
   })
 })
