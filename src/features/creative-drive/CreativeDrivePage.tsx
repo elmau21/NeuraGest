@@ -4,7 +4,7 @@ import JSZip from 'jszip'
 import {
   BadgeCheck,
   Download,
-  File,
+  File as FileIcon,
   Folder,
   FolderPlus,
   Pencil,
@@ -502,7 +502,7 @@ export function CreativeDrivePage() {
                     {item.mimeType?.startsWith('image/') && item.url ? (
                       <img src={item.url} alt="" className="cd-thumb" />
                     ) : (
-                      <File size={28} />
+                      <FileIcon size={28} />
                     )}
                     {renamingId === item.id ? (
                       <input

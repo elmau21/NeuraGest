@@ -261,7 +261,7 @@ export async function setDriveReadyForTwitch(
   if (assetKind !== undefined) patch.asset_kind = assetKind
   const { data, error } = await client
     .from('creative_drive_items')
-    .update(patch)
+    .update(patch as never)
     .eq('id', id)
     .eq('kind', 'file')
     .is('deleted_at', null)

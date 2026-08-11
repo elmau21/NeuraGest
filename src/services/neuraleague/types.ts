@@ -1,11 +1,12 @@
 import { supabase } from '@/services/supabase'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { DEFAULT_ORG_ID } from '@/services/org'
 import { isTauri } from '@/services/twitch'
 
-export function requireLeagueClient() {
+export function requireLeagueClient(): SupabaseClient {
   if (!isTauri) throw new Error('NeuraLeague requiere la app de escritorio.')
-  if (!supabase) throw new Error('No hay conexión con el almacenamiento en la nube.')
-  return supabase
+  if (!supabase) throw new Error('No hay conexion con el almacenamiento en la nube.')
+  return supabase as unknown as SupabaseClient
 }
 
 export const NL_ORG = DEFAULT_ORG_ID
