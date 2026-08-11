@@ -17,6 +17,11 @@ function roleLabel(role: AppRole): string {
     manager: 'Manager',
     staff: 'Staff',
     dev: 'Dev',
+    designer: 'Diseñador',
+    league_manager: 'Manager Liga',
+    coach: 'Coach',
+    analyst: 'Analyst',
+    player: 'Jugador',
   }
   return labels[role]
 }
@@ -81,7 +86,7 @@ export function PermissionsPanel() {
       <div className="permissions-head">
         <div>
           <h3><Shield size={16}/> Administración de permisos</h3>
-          <p>Gestiona roles owner, dev, admin, manager y staff para cuentas Twitch registradas.</p>
+          <p>Gestiona roles owner, dev, admin, manager, staff y diseñador para cuentas Twitch registradas.</p>
         </div>
         <button className="secondary" disabled={loading} onClick={() => void load()}>
           <RefreshCw size={14}/> Actualizar

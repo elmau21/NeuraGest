@@ -500,6 +500,8 @@ pub fn run() {
 
       commands::discord_rpc::discord_rpc_clear,
 
+      commands::open_twitch_channel_window,
+
     ])
 
     .build(tauri::generate_context!())

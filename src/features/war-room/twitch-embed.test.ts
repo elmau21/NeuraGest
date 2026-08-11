@@ -46,6 +46,13 @@ describe('twitch-embed helpers', () => {
     expect(buildTwitchChannelUrl('BhikoruVt')).toBe('https://www.twitch.tv/bhikoruvt')
   })
 
+  it('documenta que el mosaico embed no es sesión de cuenta', () => {
+    // player.twitch.tv con parent local no hereda el login OAuth de NeuraGest.
+    const player = buildTwitchPlayerUrl('arikyu_')
+    expect(player.startsWith('https://player.twitch.tv/')).toBe(true)
+    expect(buildTwitchChannelUrl('arikyu_')).toBe('https://www.twitch.tv/arikyu_')
+  })
+
   it('permite embed en http://localhost', () => {
     vi.stubGlobal('window', {
       location: { protocol: 'http:', hostname: 'localhost' },

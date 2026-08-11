@@ -66,6 +66,18 @@ export function presenceLabelForPath(pathname: string): string {
     '/rate-card': 'Rate Card',
     '/brief': 'Brief',
     '/assets': 'Assets',
+    '/diseno': 'Diseño gráfico',
+    '/diseno/huecos': 'Huecos de canal',
+    '/diseno/briefs': 'Briefs creativos',
+    '/neuralleague': 'NeuraLeague',
+    '/neuralleague/equipos': 'Equipos NL',
+    '/neuralleague/jugadores': 'Jugadores NL',
+    '/neuralleague/calendario': 'Calendario NL',
+    '/neuralleague/stats': 'Stats NL',
+    '/neuralleague/vods': 'VODs NL',
+    '/neuralleague/entrenamientos': 'Entrenamientos NL',
+    '/neuralleague/reclutamiento': 'Reclutamiento NL',
+    '/neuralleague/operacion': 'Operación NL',
     '/handoff': 'Handoff',
     '/media-kit': 'Media Kit',
     '/media-kit/comparar': 'Comparar kits',
@@ -84,6 +96,8 @@ export function presenceLabelForPath(pathname: string): string {
     '/ajustes': 'Ajustes',
   }
   if (exact[path]) return exact[path]
+  if (path.startsWith('/diseno/')) return 'Diseño'
+  if (path.startsWith('/neuralleague')) return 'NeuraLeague'
   if (path.startsWith('/talento/') || path.startsWith('/talentos/')) return 'Perfil de talento'
   if (path.startsWith('/portal/')) return 'Portal'
   return DEFAULT_PRESENCE_STATE

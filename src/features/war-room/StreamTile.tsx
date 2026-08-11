@@ -4,6 +4,7 @@ import {
   Maximize2,
   MessageSquare,
   Minimize2,
+  UserCheck,
   Volume2,
   VolumeX,
   X,
@@ -16,6 +17,8 @@ import {
   buildTwitchPlayerUrl,
   canEmbedTwitchPlayer,
 } from './twitch-embed'
+import { openTwitchWithAccount } from '@/services/twitch-watch'
+import { toastSuccess } from '@/stores/toast-store'
 
 type StreamTileProps = {
   talent: Talent
@@ -43,6 +46,16 @@ export function StreamTile({
   const chatSrc = buildTwitchChatUrl(talent.login)
   const channelUrl = buildTwitchChannelUrl(talent.login)
 
+  const watchWithAccount = () => {
+    void openTwitchWithAccount(talent.login).then((mode) => {
+      toastSuccess(
+        mode === 'window'
+          ? 'Ventana abierta: inicia sesión en Twitch ahí si aún no lo has hecho; así sí cuenta tu view.'
+          : 'Abierto en el navegador. Con tu sesión de Twitch, sí cuenta tu view.',
+      )
+    })
+  }
+
   return (
     <article
       className={`card wr-stream-tile${maximized ? ' is-maximized' : ''}${chatOpen ? ' has-chat' : ''}`}
@@ -66,6 +79,15 @@ export function StreamTile({
         <span className="ops-live-pill">● LIVE</span>
         <strong className="wr-stream-viewers">{talent.viewers.toLocaleString('es-MX')}</strong>
         <div className="wr-stream-actions">
+          <button
+            type="button"
+            className="wr-icon-btn wr-icon-account"
+            title="Ver con mi cuenta (sí cuenta view)"
+            aria-label={`Ver ${talent.displayName} con mi cuenta de Twitch`}
+            onClick={watchWithAccount}
+          >
+            <UserCheck size={14} />
+          </button>
           <button
             type="button"
             className="wr-icon-btn"
@@ -100,7 +122,7 @@ export function StreamTile({
             href={channelUrl}
             target="_blank"
             rel="noreferrer"
-            title="Abrir en Twitch"
+            title="Abrir en Twitch (navegador)"
             aria-label={`Abrir ${talent.displayName} en Twitch`}
           >
             <ExternalLink size={14} />
@@ -140,12 +162,12 @@ export function StreamTile({
             <div className="wr-player-fallback" role="status">
               <b>No se puede mostrar el stream aquí</b>
               <span>
-                Twitch bloquea el reproductor en esta ventana. Ábrelo en el navegador para ver el
-                directo.
+                Twitch bloquea el reproductor en esta ventana. Usa «Ver con mi cuenta» para abrirlo
+                con tu sesión (así sí cuenta tu view).
               </span>
-              <a className="secondary" href={channelUrl} target="_blank" rel="noreferrer">
-                Ver en Twitch
-              </a>
+              <button type="button" className="secondary" onClick={watchWithAccount}>
+                Ver con mi cuenta
+              </button>
             </div>
           )}
         </div>
@@ -160,7 +182,13 @@ export function StreamTile({
         )}
       </div>
 
-      {talent.title ? <p className="wr-stream-title">{talent.title}</p> : null}
+      <div className="wr-stream-foot">
+        {talent.title ? <p className="wr-stream-title">{talent.title}</p> : null}
+        <button type="button" className="wr-account-cta" onClick={watchWithAccount}>
+          <UserCheck size={13} />
+          Ver con mi cuenta
+        </button>
+      </div>
     </article>
   )
 }

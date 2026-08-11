@@ -1,10 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Activity, BadgePercent, BookMarked, BrainCircuit, CalendarCheck, CalendarDays, ChartColumnIncreasing,
-  ChevronDown, ChevronLeft, ChevronRight, Clapperboard, Coins, DoorOpen, Files, FlaskConical,
-  GitCompareArrows, HeartHandshake, IdCard, Images, Kanban, ListTodo, Loader2, LogOut, Menu, NotebookPen,
-  PackageOpen, PanelsTopLeft, PieChart, Radar, Rocket, Search, Send, Settings2, ShieldCheck, UsersRound, X,
+  Activity, Award, Beaker, BookOpen, Brain, CalendarCheck, CalendarDays, ChartColumn,
+  ChevronDown, ChevronLeft, ChevronRight, Columns3, Contact, FileText, Film, Forward, GitCompare, Handshake,
+  Image, LayoutGrid, LayoutTemplate, ListChecks, ListTodo, Loader2, LogOut, Menu, Package, Paintbrush,
+  PanelRight, PanelsTopLeft, PenLine, Percent, PieChart, Scan, Search, Settings, Shield, Sparkles, UserSearch, Users, Wallet, X,
 } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
 import { ToastHost } from '@/components/ToastHost'
@@ -44,6 +44,18 @@ import { WikiPage } from '@/features/wiki/WikiPage'
 import { RateCardPage } from '@/features/rate-card/RateCardPage'
 import { BriefPage } from '@/features/brief/BriefPage'
 import { AssetsPage } from '@/features/assets/AssetsPage'
+import { CreativeDrivePage } from '@/features/creative-drive/CreativeDrivePage'
+import { ChannelGapsPage } from '@/features/channel-gaps/ChannelGapsPage'
+import { CreativeBriefsPage } from '@/features/creative-briefs/CreativeBriefsPage'
+import { NeuraLeagueOverviewPage } from '@/features/neuraleague/NeuraLeagueOverviewPage'
+import { NeuraLeagueTeamsPage } from '@/features/neuraleague/NeuraLeagueTeamsPage'
+import { NeuraLeaguePlayersPage } from '@/features/neuraleague/NeuraLeaguePlayersPage'
+import { NeuraLeagueCalendarPage } from '@/features/neuraleague/NeuraLeagueCalendarPage'
+import { NeuraLeagueStatsPage } from '@/features/neuraleague/NeuraLeagueStatsPage'
+import { NeuraLeagueVodsPage } from '@/features/neuraleague/NeuraLeagueVodsPage'
+import { NeuraLeagueTrainingPage } from '@/features/neuraleague/NeuraLeagueTrainingPage'
+import { NeuraLeagueRecruitmentPage } from '@/features/neuraleague/NeuraLeagueRecruitmentPage'
+import { NeuraLeagueOperationsPage } from '@/features/neuraleague/NeuraLeagueOperationsPage'
 import { HandoffPage } from '@/features/handoff/HandoffPage'
 import { AuditPage } from '@/features/audit/AuditPage'
 import { ActivityInbox } from '@/features/activity/ActivityInbox'
@@ -60,7 +72,7 @@ import {
   canAccessPath,
   canMutateCrm,
   defaultPathForRoles,
-  isDevOnlyNav,
+  isBasicSettingsOnly,
 } from '@/services/permissions'
 import { canViewAudit } from '@/services/audit'
 
@@ -99,46 +111,68 @@ const navSections: ReadonlyArray<{ title: string; items: readonly NavItem[] }> =
     title: 'Ops',
     items: [
       ['/', 'Dashboard', PanelsTopLeft],
-      ['/war-room', 'War Room', Radar],
-      ['/talentos', 'Talentos', UsersRound],
-      ['/pipeline', 'Pipeline', Kanban],
-      ['/crm', 'CRM', HeartHandshake],
+      ['/war-room', 'War Room', Scan],
+      ['/talentos', 'Talentos', Users],
+      ['/pipeline', 'Pipeline', Columns3],
+      ['/crm', 'CRM', Handshake],
       ['/schedule', 'Schedule', CalendarCheck],
-      ['/comisiones', 'Comisiones', Coins],
-      ['/portal', 'Portal', DoorOpen],
+      ['/comisiones', 'Comisiones', Wallet],
+      ['/portal', 'Portal', PanelRight],
     ],
   },
   {
     title: 'Contenido',
     items: [
-      ['/rate-card', 'Rate Card', BadgePercent],
-      ['/brief', 'Brief', NotebookPen],
-      ['/assets', 'Assets', Images],
-      ['/handoff', 'Handoff', Send],
-      ['/media-kit', 'Media Kit', IdCard],
-      ['/media-kit/comparar', 'Comparar kits', GitCompareArrows],
-      ['/vod-digest', 'VOD digest', Clapperboard],
-      ['/board-pack', 'Board pack', PackageOpen],
-      ['/onboarding', 'Onboarding', Rocket],
+      ['/rate-card', 'Rate Card', Percent],
+      ['/brief', 'Brief', PenLine],
+      ['/assets', 'Assets', Image],
+      ['/handoff', 'Handoff', Forward],
+      ['/media-kit', 'Media Kit', Contact],
+      ['/media-kit/comparar', 'Comparar kits', GitCompare],
+      ['/vod-digest', 'VOD digest', Film],
+      ['/board-pack', 'Board pack', Package],
+      ['/onboarding', 'Onboarding', Sparkles],
       ['/tareas', 'Tareas', ListTodo],
-      ['/wiki', 'Wiki', BookMarked],
-      ['/documentos', 'Documentos', Files],
+      ['/wiki', 'Wiki', BookOpen],
+      ['/documentos', 'Documentos', FileText],
       ['/calendario', 'Calendario', CalendarDays],
+    ],
+  },
+  {
+    title: 'Diseño',
+    items: [
+      ['/diseno', 'Diseño gráfico', Paintbrush],
+      ['/diseno/huecos', 'Huecos de canal', LayoutTemplate],
+      ['/diseno/briefs', 'Briefs creativos', ListChecks],
+    ],
+  },
+  {
+    title: 'NeuraLeague',
+    items: [
+      ['/neuralleague', 'Temporada', LayoutGrid],
+      ['/neuralleague/equipos', 'Equipos', Award],
+      ['/neuralleague/jugadores', 'Jugadores', Users],
+      ['/neuralleague/calendario', 'Calendario', CalendarDays],
+      ['/neuralleague/stats', 'Stats', ChartColumn],
+      ['/neuralleague/vods', 'VODs', Film],
+      ['/neuralleague/entrenamientos', 'Entrenamientos', Activity],
+      ['/neuralleague/reclutamiento', 'Reclutamiento', UserSearch],
+      ['/neuralleague/operacion', 'Operación', ListChecks],
     ],
   },
   {
     title: 'Datos',
     items: [
-      ['/inteligencia', 'Inteligencia', BrainCircuit],
-      ['/ciencia-datos', 'Ciencia de datos', FlaskConical],
-      ['/estadisticas', 'Estadísticas', ChartColumnIncreasing],
+      ['/inteligencia', 'Inteligencia', Brain],
+      ['/ciencia-datos', 'Ciencia de datos', Beaker],
+      ['/estadisticas', 'Estadísticas', ChartColumn],
       ['/analitica', 'Analítica', PieChart],
-      ['/auditoria', 'Auditoría', ShieldCheck],
+      ['/auditoria', 'Auditoría', Shield],
     ],
   },
 ]
 
-const settingsNav: NavItem = ['/ajustes', 'Ajustes', Settings2]
+const settingsNav: NavItem = ['/ajustes', 'Ajustes', Settings]
 
 const navTourIds: Record<string, string> = {
   '/war-room': 'nav-war-room',
@@ -211,21 +245,24 @@ function SettingsPage() {
   const authError = useAuthStore((s) => s.error)
   const isReconnecting = oauthFlow === 'opening' || oauthFlow === 'waiting'
   const crmReadonly = !canMutateCrm(roles, session?.login)
+  const basicOnly = isBasicSettingsOnly(roles, session?.login)
   const [settingsTab, setSettingsTab] = useState<'general' | 'permisos' | 'plantillas'>('general')
 
   const helixLabel = helixStatus === 'connected'
     ? 'Conexión Twitch activa'
     : helixStatus === 'connecting' ? 'Conectando con Twitch…' : helixStatus === 'error' ? 'Error de conexión Twitch' : 'Conexión Twitch pendiente'
 
-  return <><PageTitle title="Ajustes" description="Integraciones, seguridad y preferencias."/>
-    <div className="view-tabs settings-tabs">
-      <button className={settingsTab === 'general' ? 'active' : ''} onClick={() => setSettingsTab('general')}>General</button>
-      {canAdmin && <button className={settingsTab === 'permisos' ? 'active' : ''} onClick={() => setSettingsTab('permisos')} disabled={crmReadonly} title={crmReadonly ? 'Sin permisos CRM' : undefined}>Permisos</button>}
-      <button className={settingsTab === 'plantillas' ? 'active' : ''} onClick={() => setSettingsTab('plantillas')}>Plantillas</button>
-    </div>
-    {settingsTab === 'permisos' && canAdmin ? (
+  return <><PageTitle title="Ajustes" description={basicOnly ? 'Preferencias personales y sesión.' : 'Integraciones, seguridad y preferencias.'}/>
+    {!basicOnly && (
+      <div className="view-tabs settings-tabs">
+        <button className={settingsTab === 'general' ? 'active' : ''} onClick={() => setSettingsTab('general')}>General</button>
+        {canAdmin && <button className={settingsTab === 'permisos' ? 'active' : ''} onClick={() => setSettingsTab('permisos')} disabled={crmReadonly} title={crmReadonly ? 'Sin permisos CRM' : undefined}>Permisos</button>}
+        <button className={settingsTab === 'plantillas' ? 'active' : ''} onClick={() => setSettingsTab('plantillas')}>Plantillas</button>
+      </div>
+    )}
+    {!basicOnly && settingsTab === 'permisos' && canAdmin ? (
       <Card className="permissions-card"><PermissionsPanel/></Card>
-    ) : settingsTab === 'plantillas' ? (
+    ) : !basicOnly && settingsTab === 'plantillas' ? (
       <TemplatesPanel/>
     ) : (
     <div className="settings-grid">
@@ -255,22 +292,32 @@ function SettingsPage() {
         />
       )}
     </Card>
-    <Card><h3>Monitoreo Twitch</h3><p>Métricas públicas de talentos en tiempo casi real.</p>
-      <div className={`connection helix-connection ${helixStatus}`}><div className={helixStatus === 'connected' ? 'online-dot' : helixStatus === 'error' ? 'offline-dot' : 'pending-dot'}/><div><b>{helixLabel}</b><span>{helixStatus === 'connected' ? `Monitoreo activo${lastTwitchUpdate ? ` · actualizado ${new Date(lastTwitchUpdate).toLocaleTimeString()}` : ''}` : twitchError ?? 'Preparando consulta de métricas públicas'}</span></div><button className="secondary" onClick={() => void refreshTalentData().then(() => {
-        const err = useAppStore.getState().twitchError
-        if (err) toastError('No se pudo sincronizar')
-        else toastSuccess('Sincronizado')
-      })}>Reintentar</button></div>
-    </Card>
-    <TwitchHelixSettings/>
-    <BackfillPanel/>
-    <TwitchTrackerPanel/>
-    <SupabaseStatusCard/>
-    <NativeAlertSettings/>
-    <LiveSoundSettings/>
-    <DiscordSettings/>
-    <GoogleCalendarSettings/>
-    <UpdaterPanel/>
+    {basicOnly ? (
+      <>
+        <NativeAlertSettings/>
+        <LiveSoundSettings/>
+        <DiscordSettings personalOnly/>
+      </>
+    ) : (
+      <>
+        <Card><h3>Monitoreo Twitch</h3><p>Métricas públicas de talentos en tiempo casi real.</p>
+          <div className={`connection helix-connection ${helixStatus}`}><div className={helixStatus === 'connected' ? 'online-dot' : helixStatus === 'error' ? 'offline-dot' : 'pending-dot'}/><div><b>{helixLabel}</b><span>{helixStatus === 'connected' ? `Monitoreo activo${lastTwitchUpdate ? ` · actualizado ${new Date(lastTwitchUpdate).toLocaleTimeString()}` : ''}` : twitchError ?? 'Preparando consulta de métricas públicas'}</span></div><button className="secondary" onClick={() => void refreshTalentData().then(() => {
+            const err = useAppStore.getState().twitchError
+            if (err) toastError('No se pudo sincronizar')
+            else toastSuccess('Sincronizado')
+          })}>Reintentar</button></div>
+        </Card>
+        <TwitchHelixSettings/>
+        <BackfillPanel/>
+        <TwitchTrackerPanel/>
+        <SupabaseStatusCard/>
+        <NativeAlertSettings/>
+        <LiveSoundSettings/>
+        <DiscordSettings/>
+        <GoogleCalendarSettings/>
+        <UpdaterPanel/>
+      </>
+    )}
   </div>
     )}
   </>
@@ -311,7 +358,7 @@ function Shell() {
   const logout = useAuthStore((s) => s.logout)
   const login = session?.login
   const showAudit = canViewAudit(roles)
-  const devOnly = isDevOnlyNav(roles, login)
+  const showSettingsNav = canAccessPath(roles, '/ajustes', login)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -362,8 +409,8 @@ function Shell() {
     const [to, label, Icon] = item
     const tourId = navTourIds[to]
     return (
-      <NavLink key={to} to={to} end={to === '/'} onClick={() => setMobile(false)} title={collapsed ? label : undefined} data-tour={tourId}>
-        <Icon className="sidebar-icon" size={16} strokeWidth={1.75} absoluteStrokeWidth />
+      <NavLink key={to} to={to} end={to === '/' || to === '/diseno' || to === '/neuralleague'} onClick={() => setMobile(false)} title={collapsed ? label : undefined} data-tour={tourId}>
+        <Icon className="sidebar-icon" size={16} strokeWidth={1.6} absoluteStrokeWidth />
         <span className="sidebar-link-label">{label}</span>
       </NavLink>
     )
@@ -373,12 +420,12 @@ function Shell() {
       <div className="brand">
         <div className="brand-mark" aria-hidden>NG</div>
         <img src={neuraliveLogotype} alt="NeuraGest by NeuraLive" className="brand-logotype" draggable={false} />
-        <button type="button" className="sidebar-mobile-close" onClick={() => setMobile(false)} aria-label="Cerrar menú"><X size={16} /></button>
+        <button type="button" className="sidebar-mobile-close" onClick={() => setMobile(false)} aria-label="Cerrar menú"><X size={16} strokeWidth={1.6} /></button>
       </div>
       <small className="brand-app-name">NeuraGest</small>
     </div>
     <button type="button" className="sidebar-collapse-btn" onClick={toggleCollapsed} aria-label={collapsed ? 'Expandir sidebar' : 'Colapsar sidebar'} aria-expanded={!collapsed}>
-      {collapsed ? <ChevronRight size={14} strokeWidth={2} /> : <ChevronLeft size={14} strokeWidth={2} />}
+      {collapsed ? <ChevronRight size={14} strokeWidth={1.6} /> : <ChevronLeft size={14} strokeWidth={1.6} />}
     </button>
     <nav>
       {navSections.map((section) => {
@@ -402,14 +449,19 @@ function Shell() {
               <span className="sidebar-section-label">{section.title}</span>
               <ChevronDown
                 size={12}
+                strokeWidth={1.6}
                 className={`sidebar-section-chevron${isSectionCollapsed ? ' collapsed' : ''}`}
               />
             </button>
-            {(collapsed || !isSectionCollapsed) && visibleItems.map(renderNavLink)}
+            <div className="sidebar-section-body" inert={!collapsed && isSectionCollapsed ? true : undefined} aria-hidden={isSectionCollapsed && !collapsed}>
+              <div className="sidebar-section-body-inner">
+                {visibleItems.map(renderNavLink)}
+              </div>
+            </div>
           </div>
         )
       })}
-      {!devOnly && (
+      {showSettingsNav && (
         <div className="sidebar-section sidebar-section-settings">
           {renderNavLink(settingsNav)}
         </div>
@@ -420,7 +472,7 @@ function Shell() {
       <span>{sidebarLabel}<small>Monitoreo público + caché local</small></span>
     </div>
   </aside>
-    <main><header><button className="mobile-menu" onClick={() => setMobile(true)}><Menu/></button><button className="quick-search" onClick={() => setCommandOpen(true)}><Search size={16}/>Buscar en NeuraGest<kbd>Ctrl K</kbd></button><div className="header-actions"><ActiveUsersBadge/><ActivityInbox/><div className="user-menu-wrap"><button className="user-avatar" onClick={(e) => { e.stopPropagation(); setUserMenuOpen((open) => !open) }} aria-label="Menú de usuario">{session?.avatarUrl ? <img src={session.avatarUrl} alt="" /> : avatarLabel}</button>{userMenuOpen && <div className="user-menu" onClick={(e) => e.stopPropagation()}><div className="user-menu-head"><b>{session?.displayName ?? 'Usuario'}</b><span>@{session?.login ?? 'twitch'}</span></div><button onClick={() => { setUserMenuOpen(false); void logout() }}><LogOut size={15}/>Cerrar sesión</button></div>}</div></div></header><div className="content"><RoleRouteGuard/><PageTransition><Routes location={location}><Route path="/" element={<Dashboard/>}/><Route path="/war-room" element={<WarRoomPage/>}/><Route path="/talentos" element={<Talents/>}/><Route path="/talento/:login" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando perfil…</div>}><TalentProfilePage/></Suspense>}/><Route path="/pipeline" element={<PipelinePage/>}/><Route path="/crm" element={<CrmPage/>}/><Route path="/rate-card" element={<RateCardPage/>}/><Route path="/brief" element={<BriefPage/>}/><Route path="/assets" element={<AssetsPage/>}/><Route path="/handoff" element={<HandoffPage/>}/><Route path="/comisiones" element={<CommissionsPage/>}/><Route path="/portal" element={<PortalPage/>}/><Route path="/portal/:login" element={<PortalPage/>}/><Route path="/media-kit" element={<MediaKitPage/>}/><Route path="/media-kit/comparar" element={<MediaKitComparePage/>}/><Route path="/vod-digest" element={<VodDigestPage/>}/><Route path="/board-pack" element={<BoardPackPage/>}/><Route path="/schedule" element={<ScheduleCompliancePage/>}/><Route path="/onboarding" element={<OnboardingPage/>}/><Route path="/tareas" element={<TasksPage/>}/><Route path="/wiki" element={<WikiPage/>}/><Route path="/documentos" element={<Documents/>}/><Route path="/calendario" element={<CalendarPage/>}/><Route path="/inteligencia" element={<TwitchIntelligencePage/>}/><Route path="/ciencia-datos" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense>}/><Route path="/ml" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense>}/><Route path="/estadisticas" element={<PlatformStatsPage/>}/><Route path="/analitica" element={<Analytics/>}/><Route path="/auditoria" element={showAudit ? <AuditPage/> : <Dashboard/>}/><Route path="/ajustes" element={<SettingsPage/>}/></Routes></PageTransition></div></main><CommandPalette/><ManagerTour/></div>
+    <main><header><button className="mobile-menu" onClick={() => setMobile(true)}><Menu/></button><button className="quick-search" onClick={() => setCommandOpen(true)}><Search size={16}/>Buscar en NeuraGest<kbd>Ctrl K</kbd></button><div className="header-actions"><ActiveUsersBadge/><ActivityInbox/><div className="user-menu-wrap"><button className="user-avatar" onClick={(e) => { e.stopPropagation(); setUserMenuOpen((open) => !open) }} aria-label="Menú de usuario">{session?.avatarUrl ? <img src={session.avatarUrl} alt="" /> : avatarLabel}</button>{userMenuOpen && <div className="user-menu" onClick={(e) => e.stopPropagation()}><div className="user-menu-head"><b>{session?.displayName ?? 'Usuario'}</b><span>@{session?.login ?? 'twitch'}</span></div><button onClick={() => { setUserMenuOpen(false); void logout() }}><LogOut size={15}/>Cerrar sesión</button></div>}</div></div></header><div className="content"><RoleRouteGuard/><PageTransition><Routes location={location}><Route path="/" element={<Dashboard/>}/><Route path="/war-room" element={<WarRoomPage/>}/><Route path="/talentos" element={<Talents/>}/><Route path="/talento/:login" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando perfil…</div>}><TalentProfilePage/></Suspense>}/><Route path="/pipeline" element={<PipelinePage/>}/><Route path="/crm" element={<CrmPage/>}/><Route path="/rate-card" element={<RateCardPage/>}/><Route path="/brief" element={<BriefPage/>}/><Route path="/assets" element={<AssetsPage/>}/><Route path="/diseno" element={<CreativeDrivePage/>}/><Route path="/diseno/huecos" element={<ChannelGapsPage/>}/><Route path="/diseno/briefs" element={<CreativeBriefsPage/>}/><Route path="/neuralleague" element={<NeuraLeagueOverviewPage/>}/><Route path="/neuralleague/equipos" element={<NeuraLeagueTeamsPage/>}/><Route path="/neuralleague/jugadores" element={<NeuraLeaguePlayersPage/>}/><Route path="/neuralleague/calendario" element={<NeuraLeagueCalendarPage/>}/><Route path="/neuralleague/stats" element={<NeuraLeagueStatsPage/>}/><Route path="/neuralleague/vods" element={<NeuraLeagueVodsPage/>}/><Route path="/neuralleague/entrenamientos" element={<NeuraLeagueTrainingPage/>}/><Route path="/neuralleague/reclutamiento" element={<NeuraLeagueRecruitmentPage/>}/><Route path="/neuralleague/operacion" element={<NeuraLeagueOperationsPage/>}/><Route path="/handoff" element={<HandoffPage/>}/><Route path="/comisiones" element={<CommissionsPage/>}/><Route path="/portal" element={<PortalPage/>}/><Route path="/portal/:login" element={<PortalPage/>}/><Route path="/media-kit" element={<MediaKitPage/>}/><Route path="/media-kit/comparar" element={<MediaKitComparePage/>}/><Route path="/vod-digest" element={<VodDigestPage/>}/><Route path="/board-pack" element={<BoardPackPage/>}/><Route path="/schedule" element={<ScheduleCompliancePage/>}/><Route path="/onboarding" element={<OnboardingPage/>}/><Route path="/tareas" element={<TasksPage/>}/><Route path="/wiki" element={<WikiPage/>}/><Route path="/documentos" element={<Documents/>}/><Route path="/calendario" element={<CalendarPage/>}/><Route path="/inteligencia" element={<TwitchIntelligencePage/>}/><Route path="/ciencia-datos" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense>}/><Route path="/ml" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense>}/><Route path="/estadisticas" element={<PlatformStatsPage/>}/><Route path="/analitica" element={<Analytics/>}/><Route path="/auditoria" element={showAudit ? <AuditPage/> : <Dashboard/>}/><Route path="/ajustes" element={<SettingsPage/>}/></Routes></PageTransition></div></main><CommandPalette/><ManagerTour/></div>
 }
 
 function AppGate() {

@@ -4,6 +4,8 @@ export type Talent = {
   displayName: string
   avatar: string
   banner?: string
+  /** Imagen offline del canal Twitch (si el talento la tiene configurada). */
+  offlineImageUrl?: string
   description: string
   isLive: boolean
   viewers: number

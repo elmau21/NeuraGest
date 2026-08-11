@@ -1,0 +1,2 @@
+-- NeuraGest: enum designer (aplicar antes de policies / INSERT roles)
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'designer';

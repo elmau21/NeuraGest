@@ -1,9 +1,30 @@
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri } from '@/services/twitch'
 
-export type AppRole = 'owner' | 'admin' | 'manager' | 'staff' | 'dev'
+export type AppRole =
+  | 'owner'
+  | 'admin'
+  | 'manager'
+  | 'staff'
+  | 'dev'
+  | 'designer'
+  | 'league_manager'
+  | 'coach'
+  | 'analyst'
+  | 'player'
 
-export const ALL_APP_ROLES: AppRole[] = ['owner', 'admin', 'manager', 'staff', 'dev']
+export const ALL_APP_ROLES: AppRole[] = [
+  'owner',
+  'admin',
+  'manager',
+  'staff',
+  'dev',
+  'designer',
+  'league_manager',
+  'coach',
+  'analyst',
+  'player',
+]
 export const ADMIN_ROLES: AppRole[] = ['owner', 'dev']
 
 export type AppUserRecord = {

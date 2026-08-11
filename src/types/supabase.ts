@@ -423,6 +423,138 @@ export type Database = {
           },
         ]
       }
+      creative_drive_items: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          kind: string
+          mime_type: string | null
+          name: string
+          organization_id: string
+          parent_id: string | null
+          path: string
+          size_bytes: number | null
+          storage_bucket: string | null
+          storage_path: string | null
+          updated_at: string
+          ready_for_twitch: boolean
+          asset_kind: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          kind: string
+          mime_type?: string | null
+          name: string
+          organization_id: string
+          parent_id?: string | null
+          path?: string
+          size_bytes?: number | null
+          storage_bucket?: string | null
+          storage_path?: string | null
+          updated_at?: string
+          ready_for_twitch?: boolean
+          asset_kind?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          kind?: string
+          mime_type?: string | null
+          name?: string
+          organization_id?: string
+          parent_id?: string | null
+          path?: string
+          size_bytes?: number | null
+          storage_bucket?: string | null
+          storage_path?: string | null
+          updated_at?: string
+          ready_for_twitch?: boolean
+          asset_kind?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_drive_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_drive_items_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "creative_drive_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      design_briefs: {
+        Row: {
+          id: string
+          organization_id: string
+          title: string
+          talent_id: string | null
+          talent_login: string | null
+          calendar_event_id: string | null
+          deal_id: string | null
+          stream_title: string | null
+          stream_starts_at: string | null
+          body: string
+          asset_checklist: string[]
+          drive_folder_id: string | null
+          status: string
+          created_by: string | null
+          created_at: string
+          updated_at: string
+          deleted_at: string | null
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          title: string
+          talent_id?: string | null
+          talent_login?: string | null
+          calendar_event_id?: string | null
+          deal_id?: string | null
+          stream_title?: string | null
+          stream_starts_at?: string | null
+          body?: string
+          asset_checklist?: string[]
+          drive_folder_id?: string | null
+          status?: string
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          deleted_at?: string | null
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          title?: string
+          talent_id?: string | null
+          talent_login?: string | null
+          calendar_event_id?: string | null
+          deal_id?: string | null
+          stream_title?: string | null
+          stream_starts_at?: string | null
+          body?: string
+          asset_checklist?: string[]
+          drive_folder_id?: string | null
+          status?: string
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          deleted_at?: string | null
+        }
+        Relationships: []
+      }
       document_blocks: {
         Row: {
           content: Json
@@ -1704,7 +1836,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "owner" | "admin" | "manager" | "staff"
+      app_role: "owner" | "admin" | "manager" | "staff" | "dev" | "designer" | "league_manager" | "coach" | "analyst" | "player"
       task_priority_level: "low" | "medium" | "high" | "urgent"
       task_state: "backlog" | "progress" | "review" | "done" | "archived"
     }
@@ -1834,7 +1966,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["owner", "admin", "manager", "staff"],
+      app_role: ["owner", "admin", "manager", "staff", "dev", "designer", "league_manager", "coach", "analyst", "player"],
       task_priority_level: ["low", "medium", "high", "urgent"],
       task_state: ["backlog", "progress", "review", "done", "archived"],
     },

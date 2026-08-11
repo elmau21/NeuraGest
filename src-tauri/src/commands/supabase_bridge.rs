@@ -9,7 +9,18 @@ pub(crate) const DEFAULT_ORG_ID: &str = "00000000-0000-0000-0000-000000000001";
 const PROTECTED_LOGIN: &str = "maufuwari";
 const SYNTHETIC_TWITCH_EMAIL_DOMAIN: &str = "twitch.neuragest.local";
 const ADMIN_ROLES: [&str; 2] = ["owner", "dev"];
-const ALL_ROLES: [&str; 5] = ["owner", "admin", "manager", "staff", "dev"];
+const ALL_ROLES: [&str; 10] = [
+    "owner",
+    "admin",
+    "manager",
+    "staff",
+    "dev",
+    "designer",
+    "league_manager",
+    "coach",
+    "analyst",
+    "player",
+];
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

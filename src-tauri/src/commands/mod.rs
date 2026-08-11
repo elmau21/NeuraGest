@@ -111,6 +111,8 @@ struct HelixUser {
     display_name: String,
     description: String,
     profile_image_url: String,
+    #[serde(default)]
+    offline_image_url: String,
     created_at: String,
 }
 
@@ -147,6 +149,9 @@ pub struct TalentSnapshot {
     pub(crate) created_at: String,
     pub(crate) stream_id: Option<String>,
     pub(crate) started_at: Option<String>,
+    /// URL de imagen offline del canal (vacía si el talento no la configuró).
+    #[serde(default)]
+    pub(crate) offline_image_url: String,
 }
 
 pub(crate) const TWITCH_CONFIG_MISSING: &str =
@@ -632,6 +637,7 @@ pub async fn refresh_talents(app: tauri::AppHandle) -> Result<Vec<TalentSnapshot
             created_at: user.created_at.clone(),
             stream_id: stream.map(|value| value.id.clone()),
             started_at: stream.map(|value| value.started_at.clone()),
+            offline_image_url: user.offline_image_url.clone(),
         })
     }).collect();
 
@@ -1279,4 +1285,48 @@ pub async fn collect_talent_metrics(
         collected_at,
         note,
     })
+}
+
+/// Abre (o enfoca) una ventana WebView con twitch.tv/{login}.
+/// Ahí el usuario puede iniciar sesión en Twitch; esa sesión sí puede contar view.
+/// El iframe del mosaico (player.twitch.tv) no comparte esa sesión.
+#[tauri::command]
+pub async fn open_twitch_channel_window(
+    app: tauri::AppHandle,
+    login: String,
+) -> Result<(), String> {
+    use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+
+    let login = login.trim().to_lowercase();
+    if login.is_empty()
+        || login.len() > 25
+        || !login
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        return Err("Canal de Twitch no válido".into());
+    }
+
+    let label = format!("twitch-viewer-{login}");
+    let url_str = format!("https://www.twitch.tv/{login}");
+    let parsed = url_str
+        .parse::<url::Url>()
+        .map_err(|e| format!("URL Twitch inválida: {e}"))?;
+
+    if let Some(existing) = app.get_webview_window(&label) {
+        let _ = existing.navigate(parsed.clone());
+        let _ = existing.unminimize();
+        let _ = existing.set_focus();
+        return Ok(());
+    }
+
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parsed))
+        .title(format!("Twitch · {login}"))
+        .inner_size(1280.0, 800.0)
+        .min_inner_size(640.0, 480.0)
+        .focused(true)
+        .build()
+        .map_err(|e| format!("No se pudo abrir la ventana de Twitch: {e}"))?;
+
+    Ok(())
 }

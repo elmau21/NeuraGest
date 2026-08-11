@@ -75,4 +75,5 @@ commands.allow = [
   "discord_rpc_status",
   "discord_rpc_set_presence",
   "discord_rpc_clear",
+  "open_twitch_channel_window",
 ]

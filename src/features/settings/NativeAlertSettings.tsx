@@ -8,7 +8,7 @@ import {
 import { testNativeNotification } from '@/services/native-alerts'
 import { getLiveSoundSettings, playLiveOnBeep } from '@/services/live-sound'
 import { useAuthStore } from '@/stores/auth-store'
-import { canMutate } from '@/services/permissions'
+import { canEditPersonalSettings } from '@/services/permissions'
 import { isTauri } from '@/services/twitch'
 import { toastError, toastSuccess } from '@/stores/toast-store'
 
@@ -26,7 +26,7 @@ export function NativeAlertSettings() {
   const [testResult, setTestResult] = useState<string | null>(null)
   const roles = useAuthStore((s) => s.roles)
   const session = useAuthStore((s) => s.session)
-  const readonly = !canMutate(roles, session?.login)
+  const readonly = !canEditPersonalSettings(roles, session?.login)
 
   useEffect(() => {
     void getNativeAlertSettings().then(setSettings).finally(() => setLoading(false))

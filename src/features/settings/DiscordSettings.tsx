@@ -15,7 +15,7 @@ import {
   type DiscordRpcStatus,
 } from '@/services/discord-presence'
 import { useAuthStore } from '@/stores/auth-store'
-import { canMutate } from '@/services/permissions'
+import { canEditPersonalSettings, canMutate } from '@/services/permissions'
 import { isTauri } from '@/services/twitch'
 import { toastError, toastSuccess } from '@/stores/toast-store'
 
@@ -31,7 +31,12 @@ const EVENT_VARS: Record<DiscordEventKind, Record<string, string>> = {
   campaignEnd: { talent: 'Arikyu', brand: 'MarcaX' },
 }
 
-export function DiscordSettings() {
+type DiscordSettingsProps = {
+  /** Solo estado en Discord (sin webhooks / plantillas de canal). */
+  personalOnly?: boolean
+}
+
+export function DiscordSettings({ personalOnly = false }: DiscordSettingsProps) {
   const [settings, setSettings] = useState<DiscordSettings>({
     webhookUrl: '',
     enabled: false,
@@ -47,7 +52,11 @@ export function DiscordSettings() {
   const [testingPresence, setTestingPresence] = useState(false)
   const roles = useAuthStore((s) => s.roles)
   const session = useAuthStore((s) => s.session)
-  const readonly = !canMutate(roles, session?.login)
+  const canEditChannel = canMutate(roles, session?.login)
+  const readonly = personalOnly
+    ? !canEditPersonalSettings(roles, session?.login)
+    : !canEditChannel
+  const channelReadonly = !canEditChannel
 
   useEffect(() => {
     void getDiscordSettings().then(setSettings).finally(() => setLoading(false))
@@ -120,52 +129,60 @@ export function DiscordSettings() {
   return (
     <div className="card discord-settings-card">
       <h3><MessageCircle size={16}/> Discord</h3>
-      <p>Avisos al canal y estado en tu perfil mientras usas NeuraLive.</p>
+      <p>
+        {personalOnly
+          ? 'Estado en tu perfil de Discord mientras usas NeuraGest.'
+          : 'Avisos al canal y estado en tu perfil mientras usas NeuraLive.'}
+      </p>
 
-      <h4 className="discord-section-title">Avisos al canal</h4>
-      <label className="toggle-row">
-        Notificaciones activas
-        <input
-          type="checkbox"
-          checked={settings.enabled}
-          disabled={readonly || loading}
-          onChange={(event) => setSettings({ ...settings, enabled: event.target.checked })}
-        />
-      </label>
-      <label>
-        Enlace de avisos
-        <input
-          type="url"
-          value={settings.webhookUrl}
-          readOnly={readonly}
-          onChange={(event) => setSettings({ ...settings, webhookUrl: event.target.value })}
-        />
-      </label>
+      {!personalOnly && (
+        <>
+          <h4 className="discord-section-title">Avisos al canal</h4>
+          <label className="toggle-row">
+            Notificaciones activas
+            <input
+              type="checkbox"
+              checked={settings.enabled}
+              disabled={channelReadonly || loading}
+              onChange={(event) => setSettings({ ...settings, enabled: event.target.checked })}
+            />
+          </label>
+          <label>
+            Enlace de avisos
+            <input
+              type="url"
+              value={settings.webhookUrl}
+              readOnly={channelReadonly}
+              onChange={(event) => setSettings({ ...settings, webhookUrl: event.target.value })}
+            />
+          </label>
 
-      <div className="discord-event-templates">
-        <h4>Mensajes por evento</h4>
-        {(Object.keys(EVENT_LABELS) as DiscordEventKind[]).map((kind) => (
-          <div className="discord-template-row" key={kind}>
-            <label>
-              {EVENT_LABELS[kind]}
-              <textarea
-                rows={2}
-                value={templates[kind]}
-                readOnly={readonly}
-                onChange={(e) => updateTemplate(kind, e.target.value)}
-              />
-            </label>
-            <div className="discord-template-meta">
-              <small>Vista previa: {renderDiscordEventTemplate(templates[kind], EVENT_VARS[kind])}</small>
-              {!readonly && (
-                <button type="button" className="secondary" onClick={() => void testTemplate(kind)}>
-                  <Send size={13} /> Probar
-                </button>
-              )}
-            </div>
+          <div className="discord-event-templates">
+            <h4>Mensajes por evento</h4>
+            {(Object.keys(EVENT_LABELS) as DiscordEventKind[]).map((kind) => (
+              <div className="discord-template-row" key={kind}>
+                <label>
+                  {EVENT_LABELS[kind]}
+                  <textarea
+                    rows={2}
+                    value={templates[kind]}
+                    readOnly={channelReadonly}
+                    onChange={(e) => updateTemplate(kind, e.target.value)}
+                  />
+                </label>
+                <div className="discord-template-meta">
+                  <small>Vista previa: {renderDiscordEventTemplate(templates[kind], EVENT_VARS[kind])}</small>
+                  {!channelReadonly && (
+                    <button type="button" className="secondary" onClick={() => void testTemplate(kind)}>
+                      <Send size={13} /> Probar
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
 
       <div className="discord-presence-block">
         <h4 className="discord-section-title"><Radio size={14} /> Estado en Discord</h4>

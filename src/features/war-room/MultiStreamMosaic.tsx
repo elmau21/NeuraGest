@@ -105,7 +105,8 @@ export function MultiStreamMosaic({ liveTalents }: MultiStreamMosaicProps) {
           <div>
             <h2>Mosaico en vivo</h2>
             <p>
-              Hasta {MAX_MOSAIC_STREAMS} streams a la vez · {mosaicTalents.length} en el mosaico
+              Hasta {MAX_MOSAIC_STREAMS} streams a la vez · {mosaicTalents.length} en el mosaico.
+              El mosaico no suma view a tu cuenta; usa «Ver con mi cuenta» en cada tile.
             </p>
           </div>
         </div>

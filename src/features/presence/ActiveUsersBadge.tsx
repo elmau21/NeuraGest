@@ -18,6 +18,18 @@ const PAGE_LABELS: Record<string, string> = {
   '/rate-card': 'Rate Card',
   '/brief': 'Brief',
   '/assets': 'Assets',
+  '/diseno': 'Diseño gráfico',
+  '/diseno/huecos': 'Huecos de canal',
+  '/diseno/briefs': 'Briefs creativos',
+  '/neuralleague': 'NeuraLeague',
+  '/neuralleague/equipos': 'Equipos NL',
+  '/neuralleague/jugadores': 'Jugadores NL',
+  '/neuralleague/calendario': 'Calendario NL',
+  '/neuralleague/stats': 'Stats NL',
+  '/neuralleague/vods': 'VODs NL',
+  '/neuralleague/entrenamientos': 'Entrenamientos NL',
+  '/neuralleague/reclutamiento': 'Reclutamiento NL',
+  '/neuralleague/operacion': 'Operación NL',
   '/handoff': 'Handoff',
   '/media-kit': 'Media Kit',
   '/vod-digest': 'VOD digest',
@@ -38,6 +50,8 @@ const PAGE_LABELS: Record<string, string> = {
 function pageLabel(path?: string): string | null {
   if (!path) return null
   if (PAGE_LABELS[path]) return PAGE_LABELS[path]
+  if (path.startsWith('/diseno/')) return 'Diseño'
+  if (path.startsWith('/neuralleague')) return 'NeuraLeague'
   if (path.startsWith('/talento/')) return 'Perfil de talento'
   if (path.startsWith('/portal/')) return 'Portal'
   if (path.startsWith('/media-kit')) return 'Media Kit'

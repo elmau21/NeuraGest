@@ -168,8 +168,9 @@ export function buildWeeklyComparison(
 
   const logins = [...new Set(snapshots.map((row) => row.login))]
   return logins.map((login) => {
-    const thisWeek = aggregateWeek(snapshotsInRange(snapshots, thisStart, now))
-    const lastWeek = aggregateWeek(snapshotsInRange(snapshots, lastStart, lastEnd))
+    const talentSnapshots = snapshots.filter((row) => row.login === login)
+    const thisWeek = aggregateWeek(snapshotsInRange(talentSnapshots, thisStart, now))
+    const lastWeek = aggregateWeek(snapshotsInRange(talentSnapshots, lastStart, lastEnd))
     const deltaAvgViewers = thisWeek.avgViewers - lastWeek.avgViewers
     const deltaPeakViewers = thisWeek.peakViewers - lastWeek.peakViewers
     const deltaPct = lastWeek.avgViewers > 0
