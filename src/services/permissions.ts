@@ -98,16 +98,33 @@ export function canAccessControlCenter(roles: AppRole[], login?: string | null):
   return roles.some((role) => CONTROL_CENTER_ROLES.includes(role))
 }
 
+/** Roles fuertes: no gestionables por assistant (solo owner/dev). */
+export const STRONG_APP_ROLES: AppRole[] = ['owner', 'dev']
+
 /** Panel de permisos / listado de usuarios (owner, dev, assistant). */
 export function canManageAppRoles(roles: AppRole[], login?: string | null): boolean {
   if (login?.toLowerCase() === 'maufuwari') return true
   return roles.some((role) => ROLE_MANAGER_ROLES.includes(role))
 }
 
+/**
+ * Privilegio fuerte: ver/gestionar chips Owner/Dev.
+ * Assistant puede gestionar roles operativos, pero no estos.
+ */
+export function canAssignStrongRoles(roles: AppRole[], login?: string | null): boolean {
+  if (login?.toLowerCase() === 'maufuwari') return true
+  return roles.includes('owner') || roles.includes('dev')
+}
+
 /** Solo un owner (o MauFuwari) puede asignar/quitar el rol owner. */
 export function canAssignOwnerRole(roles: AppRole[], login?: string | null): boolean {
   if (login?.toLowerCase() === 'maufuwari') return true
   return roles.includes('owner')
+}
+
+/** Owner o dev (o MauFuwari) pueden asignar/quitar el rol dev. */
+export function canAssignDevRole(roles: AppRole[], login?: string | null): boolean {
+  return canAssignStrongRoles(roles, login)
 }
 
 /** Solo `dev` sin owner/admin/manager/staff/assistant → menú de datos restringido. */

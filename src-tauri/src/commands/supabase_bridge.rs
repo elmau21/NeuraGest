@@ -511,11 +511,20 @@ pub async fn set_app_user_roles(
     let caller_is_owner = caller_roles.iter().any(|role| role == "owner");
     let caller_elevated = caller_is_owner_or_dev(&caller_roles);
 
+    let next_has_dev = roles.iter().any(|role| role == "dev");
+    let current_has_dev = current_roles.iter().any(|role| role == "dev");
+
     if next_has_owner && !caller_is_owner {
         return Err("Solo un owner puede asignar el rol owner.".into());
     }
     if current_has_owner && !next_has_owner && !caller_is_owner {
         return Err("Solo un owner puede quitar el rol owner.".into());
+    }
+    if next_has_dev && !current_has_dev && !caller_elevated {
+        return Err("Solo un owner o dev puede asignar el rol dev.".into());
+    }
+    if current_has_dev && !next_has_dev && !caller_elevated {
+        return Err("Solo un owner o dev puede quitar el rol dev.".into());
     }
 
     let is_protected = target.twitch_login.eq_ignore_ascii_case(PROTECTED_LOGIN);

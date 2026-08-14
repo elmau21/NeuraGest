@@ -3,7 +3,9 @@ import {
   canAccessControlCenter,
   canAccessPath,
   canAdminMutate,
+  canAssignDevRole,
   canAssignOwnerRole,
+  canAssignStrongRoles,
   canEditPersonalSettings,
   canManageAppRoles,
   canMutate,
@@ -23,6 +25,7 @@ import {
   isRestrictedNav,
   LEAGUE_ALLOWED_PATHS,
   LEAGUE_DEFAULT_PATH,
+  STRONG_APP_ROLES,
 } from './permissions'
 import { canViewAudit } from './audit'
 
@@ -172,6 +175,14 @@ describe('nav por rol', () => {
     expect(canManageAppRoles(['assistant'])).toBe(true)
     expect(canAssignOwnerRole(['assistant'])).toBe(false)
     expect(canAssignOwnerRole(['owner'])).toBe(true)
+    expect(canAssignStrongRoles(['assistant'])).toBe(false)
+    expect(canAssignStrongRoles(['owner'])).toBe(true)
+    expect(canAssignStrongRoles(['dev'])).toBe(true)
+    expect(canAssignStrongRoles(['owner', 'assistant'])).toBe(true)
+    expect(canAssignDevRole(['assistant'])).toBe(false)
+    expect(canAssignDevRole(['dev'])).toBe(true)
+    expect(canAssignDevRole(['owner'])).toBe(true)
+    expect(STRONG_APP_ROLES).toEqual(['owner', 'dev'])
     expect(canViewAudit(['assistant'])).toBe(true)
     expect(canAccessControlCenter(['assistant'])).toBe(true)
     expect(canAccessControlCenter(['owner'])).toBe(true)

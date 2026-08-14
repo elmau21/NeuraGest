@@ -8,7 +8,12 @@ import {
   setAppUserRoles,
 } from '@/services/app-users'
 import { logRoleActivity } from '@/services/audit'
-import { canAssignOwnerRole } from '@/services/permissions'
+import {
+  canAssignDevRole,
+  canAssignOwnerRole,
+  canAssignStrongRoles,
+  STRONG_APP_ROLES,
+} from '@/services/permissions'
 import { useAuthStore } from '@/stores/auth-store'
 import { toastError, toastSuccess } from '@/stores/toast-store'
 
@@ -39,13 +44,18 @@ type PermissionsPanelProps = {
 export function PermissionsPanel({ compact = false, hideRoles = [] }: PermissionsPanelProps) {
   const session = useAuthStore((s) => s.session)
   const actorRoles = useAuthStore((s) => s.roles)
+  const canStrong = canAssignStrongRoles(actorRoles, session?.login)
   const canAssignOwner = canAssignOwnerRole(actorRoles, session?.login)
+  const canAssignDev = canAssignDevRole(actorRoles, session?.login)
   const [users, setUsers] = useState<AppUserRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyUserId, setBusyUserId] = useState<string | null>(null)
 
-  const visibleRoles = ALL_APP_ROLES.filter((role) => !hideRoles.includes(role))
+  const autoHideStrong = canStrong ? [] : STRONG_APP_ROLES
+  const visibleRoles = ALL_APP_ROLES.filter(
+    (role) => !hideRoles.includes(role) && !autoHideStrong.includes(role),
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -73,6 +83,10 @@ export function PermissionsPanel({ compact = false, hideRoles = [] }: Permission
       toastError('Solo un owner puede asignar o quitar el rol Owner')
       return
     }
+    if (role === 'dev' && !canAssignDev) {
+      toastError('Solo un owner o dev puede asignar o quitar el rol Dev')
+      return
+    }
 
     const isProtected = user.twitchLogin.toLowerCase() === 'maufuwari'
     const losingAdmin = isProtected && hasRole && (role === 'owner' || role === 'dev')
@@ -82,7 +96,7 @@ export function PermissionsPanel({ compact = false, hideRoles = [] }: Permission
         toastError('No puedes degradar el owner de MauFuwari')
         return
       }
-      if (!actorRoles.includes('owner') && !actorRoles.includes('dev') && session?.login?.toLowerCase() !== 'maufuwari') {
+      if (!canStrong) {
         toastError('No puedes degradar roles owner/dev de MauFuwari')
         return
       }
@@ -165,18 +179,22 @@ export function PermissionsPanel({ compact = false, hideRoles = [] }: Permission
                 {visibleRoles.map((role) => {
                   const active = user.roles.includes(role)
                   const ownerLocked = role === 'owner' && !canAssignOwner
+                  const devLocked = role === 'dev' && !canAssignDev
+                  const strongLocked = ownerLocked || devLocked
                   return (
                     <button
                       key={role}
                       className={`role-chip ${active ? 'active' : ''}`}
-                      disabled={busyUserId === user.id || ownerLocked}
+                      disabled={busyUserId === user.id || strongLocked}
                       onClick={() => void toggleRole(user, role)}
                       title={
                         ownerLocked
                           ? 'Solo un owner puede gestionar este rol'
-                          : active
-                            ? `Quitar ${roleLabel(role)}`
-                            : `Asignar ${roleLabel(role)}`
+                          : devLocked
+                            ? 'Solo un owner o dev puede gestionar este rol'
+                            : active
+                              ? `Quitar ${roleLabel(role)}`
+                              : `Asignar ${roleLabel(role)}`
                       }
                     >
                       {roleLabel(role)}

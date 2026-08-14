@@ -90,3 +90,26 @@ export async function notifyLiveTalents(talents: Talent[], previousLiveIds: Set<
     await postLiveToDiscord(talent)
   }
 }
+
+/** Aviso operativo genérico (Centro de control). Devuelve 'ok' | 'disabled' | 'error'. */
+export async function postOpsDiscordAlert(
+  content: string,
+): Promise<'ok' | 'disabled' | 'error'> {
+  const settings = await getDiscordSettings()
+  if (!settings.enabled || !settings.webhookUrl.trim()) return 'disabled'
+  const text = content.trim()
+  if (!text) return 'error'
+  try {
+    const response = await fetch(settings.webhookUrl.trim(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: text.slice(0, 1800),
+        embeds: [{ footer: { text: 'NeuraGest · Centro de control' } }],
+      }),
+    })
+    return response.ok ? 'ok' : 'error'
+  } catch {
+    return 'error'
+  }
+}
