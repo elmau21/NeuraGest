@@ -2,10 +2,15 @@ import { useState } from 'react'
 import { FileText, FolderOpen } from '@/components/icons'
 import { DocumentDrive, documentDriveFileCount } from '@/features/documents/DocumentDrive'
 import { WikiPage } from '@/features/wiki/WikiPage'
+import { canAccessContratos } from '@/services/permissions'
+import { useAuthStore } from '@/stores/auth-store'
 
 export function Documents() {
   const [tab, setTab] = useState<'drive' | 'wiki'>('drive')
-  const fileCount = documentDriveFileCount()
+  const roles = useAuthStore((s) => s.roles)
+  const session = useAuthStore((s) => s.session)
+  const canSeeContracts = canAccessContratos(roles, session?.login)
+  const fileCount = documentDriveFileCount(canSeeContracts)
 
   return <>
     <div className="page-title">

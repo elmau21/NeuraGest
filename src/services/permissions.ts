@@ -72,12 +72,20 @@ export function canAdminMutate(roles: AppRole[], login?: string | null): boolean
   return roles.some((role) => ADMIN_MUTATE_ROLES.includes(role))
 }
 
-/** Crear carpetas en Document Drive (/documentos). Director de esports → rol `manager`. */
-export const DOCUMENT_DRIVE_FOLDER_ROLES: AppRole[] = ['owner', 'assistant', 'manager']
+/** Crear carpetas en Document Drive (/documentos). Director de esports → rol `league_manager` (Manager Liga). */
+export const DOCUMENT_DRIVE_FOLDER_ROLES: AppRole[] = ['owner', 'assistant', 'league_manager']
 
 export function canCreateDocumentDriveFolder(roles: AppRole[], login?: string | null): boolean {
   if (login?.toLowerCase() === 'maufuwari') return true
   return roles.some((role) => DOCUMENT_DRIVE_FOLDER_ROLES.includes(role))
+}
+
+/** Lectura de Contratos en Document Drive (datos sensibles; no admin/dev). */
+export const CONTRATOS_ACCESS_ROLES: AppRole[] = DOCUMENT_DRIVE_FOLDER_ROLES
+
+export function canAccessContratos(roles: AppRole[], login?: string | null): boolean {
+  if (login?.toLowerCase() === 'maufuwari') return true
+  return roles.some((role) => CONTRATOS_ACCESS_ROLES.includes(role))
 }
 
 /** Escritura en Drive creativo, briefs y huecos de canal. */

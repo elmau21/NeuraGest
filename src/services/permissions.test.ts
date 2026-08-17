@@ -8,6 +8,7 @@ import {
   canAssignOwnerRole,
   canAssignStrongRoles,
   canCreateDocumentDriveFolder,
+  canAccessContratos,
   canEditPersonalSettings,
   canManageAppRoles,
   canMutate,
@@ -227,16 +228,28 @@ describe('nav por rol', () => {
     expect(canAccessPath(['admin'], '/crm')).toBe(true)
   })
 
-  it('canCreateDocumentDriveFolder: owner, manager y assistant; no admin/dev/staff', () => {
+  it('canCreateDocumentDriveFolder: owner, league_manager y assistant; no manager/admin/dev', () => {
     expect(canCreateDocumentDriveFolder(['owner'])).toBe(true)
-    expect(canCreateDocumentDriveFolder(['manager'])).toBe(true)
+    expect(canCreateDocumentDriveFolder(['league_manager'])).toBe(true)
     expect(canCreateDocumentDriveFolder(['assistant'])).toBe(true)
     expect(canCreateDocumentDriveFolder(['owner', 'assistant'])).toBe(true)
+    expect(canCreateDocumentDriveFolder(['manager'])).toBe(false)
     expect(canCreateDocumentDriveFolder(['admin'])).toBe(false)
     expect(canCreateDocumentDriveFolder(['dev'])).toBe(false)
     expect(canCreateDocumentDriveFolder(['staff'])).toBe(false)
     expect(canCreateDocumentDriveFolder(['designer'])).toBe(false)
-    expect(canCreateDocumentDriveFolder(['league_manager'])).toBe(false)
     expect(canCreateDocumentDriveFolder(['coach'])).toBe(false)
+  })
+
+  it('canAccessContratos: owner, league_manager y assistant; no manager/admin/dev', () => {
+    expect(canAccessContratos(['owner'])).toBe(true)
+    expect(canAccessContratos(['league_manager'])).toBe(true)
+    expect(canAccessContratos(['assistant'])).toBe(true)
+    expect(canAccessContratos(['manager'])).toBe(false)
+    expect(canAccessContratos(['admin'])).toBe(false)
+    expect(canAccessContratos(['dev'])).toBe(false)
+    expect(canAccessContratos(['staff'])).toBe(false)
+    expect(canAccessContratos(['designer'])).toBe(false)
+    expect(canAccessContratos(['coach'])).toBe(false)
   })
 })

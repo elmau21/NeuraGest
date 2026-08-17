@@ -6,6 +6,10 @@ import { formatDriveSize } from '@/services/creative-drive'
 export const DOCUMENT_DRIVE_CATEGORIES = ['Contratos', 'Directivas', 'Extras'] as const
 export type DocumentDriveCategory = (typeof DOCUMENT_DRIVE_CATEGORIES)[number]
 
+/** Categoría interna para carpetas raíz personalizadas y su contenido. */
+export const ROOT_CUSTOM_CATEGORY = 'Root' as const
+export type DocumentDriveStorageCategory = DocumentDriveCategory | typeof ROOT_CUSTOM_CATEGORY
+
 export const CONTRACTS_BUCKET = 'contratos'
 export const ORG_DOCUMENTS_BUCKET = 'org-documents'
 
@@ -14,7 +18,7 @@ export type DocumentDriveItemKind = 'folder' | 'file'
 export type DocumentDriveItem = {
   id: string
   parentId: string | null
-  category: DocumentDriveCategory
+  category: DocumentDriveStorageCategory
   title: string
   path: string
   kind: DocumentDriveItemKind
@@ -30,6 +34,7 @@ export type DocumentDriveItem = {
   isLocal?: boolean
   localUrl?: string
   talentLogin?: string
+  isRootCustom?: boolean
 }
 
 type DocumentRow = {
@@ -47,17 +52,18 @@ type DocumentRow = {
   created_by: string | null
   created_at: string
   updated_at: string
+  is_root_custom: boolean | null
 }
 
 const DRIVE_SELECT =
-  'id,parent_id,category,title,path,kind,file_name,mime_type,size_bytes,storage_bucket,storage_path,created_by,created_at,updated_at'
+  'id,parent_id,category,title,path,kind,file_name,mime_type,size_bytes,storage_bucket,storage_path,created_by,created_at,updated_at,is_root_custom'
 
 function requireClient() {
   if (!supabase) throw new Error('No hay conexión con el almacenamiento en la nube.')
   return supabase
 }
 
-function bucketForCategory(category: DocumentDriveCategory): string {
+function bucketForCategory(category: DocumentDriveStorageCategory): string {
   return category === 'Contratos' ? CONTRACTS_BUCKET : ORG_DOCUMENTS_BUCKET
 }
 
@@ -70,7 +76,7 @@ function mapRow(row: DocumentRow, url?: string): DocumentDriveItem {
   return {
     id: row.id,
     parentId: row.parent_id,
-    category: row.category as DocumentDriveCategory,
+    category: row.category as DocumentDriveStorageCategory,
     title: row.title,
     path: row.path,
     kind: row.kind === 'folder' ? 'folder' : 'file',
@@ -83,13 +89,30 @@ function mapRow(row: DocumentRow, url?: string): DocumentDriveItem {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     url,
+    isRootCustom: row.is_root_custom ?? undefined,
   }
 }
 
 export { formatDriveSize }
 
+export async function listRootCustomFolders(): Promise<DocumentDriveItem[]> {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('documents')
+    .select(DRIVE_SELECT)
+    .eq('organization_id', DEFAULT_ORG_ID)
+    .eq('category', ROOT_CUSTOM_CATEGORY)
+    .eq('kind', 'folder')
+    .eq('is_root_custom', true)
+    .is('parent_id', null)
+    .is('deleted_at', null)
+    .order('title', { ascending: true })
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as unknown as DocumentRow[]).map((row) => mapRow(row))
+}
+
 export async function listDocumentDriveItems(
-  category: DocumentDriveCategory,
+  category: DocumentDriveStorageCategory,
   parentId: string | null,
 ): Promise<DocumentDriveItem[]> {
   const client = requireClient()
@@ -150,13 +173,16 @@ export async function getDocumentDriveItem(id: string): Promise<DocumentDriveIte
 
 export async function createDocumentDriveFolder(
   name: string,
-  category: DocumentDriveCategory,
+  category: DocumentDriveStorageCategory,
   parentId: string | null,
   parentPath: string,
 ): Promise<DocumentDriveItem> {
   const client = requireClient()
   const trimmed = name.trim()
   if (!trimmed) throw new Error('Escribe un nombre para la carpeta.')
+  if (isReservedRootFolderName(trimmed)) {
+    throw new Error('Ese nombre está reservado para una categoría del sistema.')
+  }
   const path = joinPath(parentPath, trimmed)
   const { data, error } = await client
     .from('documents')
@@ -167,6 +193,7 @@ export async function createDocumentDriveFolder(
       title: trimmed,
       path,
       kind: 'folder',
+      is_root_custom: false,
     })
     .select(DRIVE_SELECT)
     .single()
@@ -178,9 +205,38 @@ export async function createDocumentDriveFolder(
   return mapRow(data as unknown as DocumentRow)
 }
 
+export async function createRootCustomFolder(name: string): Promise<DocumentDriveItem> {
+  const client = requireClient()
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error('Escribe un nombre para la carpeta.')
+  if (isReservedRootFolderName(trimmed)) {
+    throw new Error('Ese nombre está reservado para una categoría del sistema.')
+  }
+  const path = joinPath('/', trimmed)
+  const { data, error } = await client
+    .from('documents')
+    .insert({
+      organization_id: DEFAULT_ORG_ID,
+      parent_id: null,
+      category: ROOT_CUSTOM_CATEGORY,
+      title: trimmed,
+      path,
+      kind: 'folder',
+      is_root_custom: true,
+    })
+    .select(DRIVE_SELECT)
+    .single()
+  if (error) {
+    if (error.code === '23505') throw new Error('Ya existe una carpeta con ese nombre en la raíz.')
+    throw new Error(error.message)
+  }
+  await logDocumentDriveActivity('created_folder', trimmed, ROOT_CUSTOM_CATEGORY, data.id)
+  return mapRow(data as unknown as DocumentRow)
+}
+
 export async function uploadDocumentDriveFile(
   file: File,
-  category: DocumentDriveCategory,
+  category: DocumentDriveStorageCategory,
   parentId: string | null,
   parentPath: string,
 ): Promise<DocumentDriveItem> {
@@ -290,11 +346,20 @@ export async function deleteDocumentDriveItem(id: string): Promise<void> {
 export async function logDocumentDriveActivity(
   action: 'uploaded' | 'deleted' | 'renamed' | 'created_folder' | 'viewed' | 'downloaded',
   name: string,
-  category: DocumentDriveCategory,
+  category: DocumentDriveStorageCategory,
   entityId?: string,
 ): Promise<void> {
   const entityType = category === 'Contratos' ? 'contract' : 'document'
   await logActivity(entityType, action, { title: name, fileName: name, category }, entityId ?? null)
+}
+
+export function isReservedRootFolderName(name: string): boolean {
+  const normalized = name.trim().toLowerCase()
+  return DOCUMENT_DRIVE_CATEGORIES.some((cat) => cat.toLowerCase() === normalized)
+}
+
+export function isCustomRootFolder(item: DocumentDriveItem): boolean {
+  return item.kind === 'folder' && item.isRootCustom === true
 }
 
 export function isPdfItem(item: DocumentDriveItem): boolean {

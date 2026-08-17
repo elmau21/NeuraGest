@@ -749,6 +749,7 @@ export type Database = {
           title: string
           updated_at: string | null
           version: number | null
+          is_root_custom: boolean
         }
         Insert: {
           category?: string
@@ -771,6 +772,7 @@ export type Database = {
           title: string
           updated_at?: string | null
           version?: number | null
+          is_root_custom?: boolean
         }
         Update: {
           category?: string
@@ -793,6 +795,7 @@ export type Database = {
           title?: string
           updated_at?: string | null
           version?: number | null
+          is_root_custom?: boolean
         }
         Relationships: [
           {

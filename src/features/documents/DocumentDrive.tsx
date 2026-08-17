@@ -24,29 +24,34 @@ import {
 import {
   categoryRootPath,
   createDocumentDriveFolder,
+  createRootCustomFolder,
   deleteDocumentDriveItem,
   DOCUMENT_DRIVE_CATEGORIES,
   formatDriveSize,
   getDocumentDriveItem,
   isPdfItem,
   listDocumentDriveItems,
+  listRootCustomFolders,
   logDocumentDriveActivity,
   renameDocumentDriveItem,
+  ROOT_CUSTOM_CATEGORY,
   ROOT_FOLDER_META,
   uploadDocumentDriveFile,
   type DocumentDriveCategory,
   type DocumentDriveItem,
+  type DocumentDriveStorageCategory,
 } from '@/services/document-drive'
 import { logContractActivity } from '@/services/audit'
 import { listAppUsers } from '@/services/app-users'
-import { canCreateDocumentDriveFolder, canMutate } from '@/services/permissions'
+import { canAccessContratos, canCreateDocumentDriveFolder, canMutate } from '@/services/permissions'
 import { useAuthStore } from '@/stores/auth-store'
 import { toastError, toastSuccess } from '@/stores/toast-store'
 
 type Crumb =
   | { type: 'root'; name: string }
   | { type: 'category'; category: DocumentDriveCategory; name: string; path: string }
-  | { type: 'folder'; category: DocumentDriveCategory; id: string; name: string; path: string }
+  | { type: 'customRoot'; id: string; name: string; path: string }
+  | { type: 'folder'; category: DocumentDriveStorageCategory; id: string; name: string; path: string }
 
 type PreviewTarget =
   | { kind: 'local'; contract: LocalContract }
@@ -88,15 +93,18 @@ export function DocumentDrive() {
   const session = useAuthStore((s) => s.session)
   const readonly = !canMutate(roles, session?.login)
   const canCreateFolder = canCreateDocumentDriveFolder(roles, session?.login)
+  const canAccessContracts = canAccessContratos(roles, session?.login)
   const fileRef = useRef<HTMLInputElement>(null)
   const isFirstLoad = useRef(true)
 
   const [crumbs, setCrumbs] = useState<Crumb[]>([{ type: 'root', name: 'Archivos' }])
   const [items, setItems] = useState<DocumentDriveItem[]>([])
-  const [localItems, setLocalItems] = useState<LocalContract[]>(localContracts)
+  const [rootCustomFolders, setRootCustomFolders] = useState<DocumentDriveItem[]>([])
+  const [localItems, setLocalItems] = useState<LocalContract[]>([])
   const [loading, setLoading] = useState(true)
   const [contentFaded, setContentFaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [contratosBlocked, setContratosBlocked] = useState(false)
   const [query, setQuery] = useState('')
   const [uploaderNames, setUploaderNames] = useState<Record<string, string>>({})
   const [folderOpen, setFolderOpen] = useState(false)
@@ -109,31 +117,73 @@ export function DocumentDrive() {
   const [previewError, setPreviewError] = useState(false)
 
   const current = crumbs[crumbs.length - 1]
-  const inCategory = current.type !== 'root'
-  const category = current.type === 'category' || current.type === 'folder' ? current.category : null
-  const parentId = current.type === 'folder' ? current.id : null
+  const atRoot = current.type === 'root'
+  const inDrive = current.type !== 'root'
+  const driveCategory: DocumentDriveStorageCategory | null =
+    current.type === 'category'
+      ? current.category
+      : current.type === 'customRoot'
+        ? ROOT_CUSTOM_CATEGORY
+        : current.type === 'folder'
+          ? current.category
+          : null
+  const parentId =
+    current.type === 'folder' || current.type === 'customRoot' ? current.id : null
   const parentPath = current.type === 'root' ? '/' : current.path
 
+  const visibleCategories = useMemo(
+    () => DOCUMENT_DRIVE_CATEGORIES.filter((cat) => cat !== 'Contratos' || canAccessContracts),
+    [canAccessContracts],
+  )
+
+  useEffect(() => {
+    if (driveCategory === 'Contratos' && !canAccessContracts) {
+      setContratosBlocked(true)
+      setPreview(null)
+      setQuery('')
+      setCrumbs([{ type: 'root', name: 'Archivos' }])
+    }
+  }, [driveCategory, canAccessContracts])
+
   const fetchItems = useCallback(async () => {
-    if (!category) {
+    if (atRoot) {
+      const [roots, users] = await Promise.all([
+        listRootCustomFolders(),
+        listAppUsers().catch(() => []),
+      ])
+      setRootCustomFolders(roots)
+      setItems([])
+      const names: Record<string, string> = {}
+      for (const u of users) {
+        names[u.id] = u.displayName?.trim() || (u.twitchLogin ? `@${u.twitchLogin}` : u.id.slice(0, 8))
+      }
+      setUploaderNames(names)
+      return
+    }
+    if (!driveCategory) {
       setItems([])
       return
     }
+    if (driveCategory === 'Contratos' && !canAccessContracts) {
+      setItems([])
+      setLocalItems([])
+      return
+    }
     const [rows, users, remote] = await Promise.all([
-      listDocumentDriveItems(category, parentId),
+      listDocumentDriveItems(driveCategory, parentId),
       listAppUsers().catch(() => []),
-      category === 'Contratos' && parentId == null
+      driveCategory === 'Contratos' && parentId == null
         ? loadRemoteContractUrls().then(mergeLocalContracts)
         : Promise.resolve(localItems),
     ])
     setItems(rows)
-    if (category === 'Contratos' && parentId == null) setLocalItems(remote)
+    if (driveCategory === 'Contratos' && parentId == null) setLocalItems(remote)
     const names: Record<string, string> = {}
     for (const u of users) {
       names[u.id] = u.displayName?.trim() || (u.twitchLogin ? `@${u.twitchLogin}` : u.id.slice(0, 8))
     }
     setUploaderNames(names)
-  }, [category, parentId])
+  }, [atRoot, driveCategory, parentId, canAccessContracts, localItems])
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -177,13 +227,13 @@ export function DocumentDrive() {
   }, [current, fetchItems])
 
   const mergedItems = useMemo(() => {
-    if (category !== 'Contratos' || parentId != null) return items
+    if (driveCategory !== 'Contratos' || parentId != null) return items
     const cloudNames = new Set(items.map((i) => (i.fileName ?? i.title).toLowerCase()))
     const locals = localItems
       .filter((c) => !cloudNames.has(c.fileName.toLowerCase()))
       .map(localToDriveItem)
     return [...items, ...locals].sort((a, b) => a.title.localeCompare(b.title, 'es'))
-  }, [category, parentId, items, localItems])
+  }, [driveCategory, parentId, items, localItems])
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -197,6 +247,11 @@ export function DocumentDrive() {
   const files = useMemo(() => filteredItems.filter((i) => i.kind === 'file'), [filteredItems])
 
   const openCategory = (cat: DocumentDriveCategory) => {
+    if (cat === 'Contratos' && !canAccessContracts) {
+      setContratosBlocked(true)
+      return
+    }
+    setContratosBlocked(false)
     setPreview(null)
     setQuery('')
     setCrumbs([
@@ -205,17 +260,28 @@ export function DocumentDrive() {
     ])
   }
 
+  const openCustomRootFolder = (item: DocumentDriveItem) => {
+    setContratosBlocked(false)
+    setPreview(null)
+    setQuery('')
+    setCrumbs([
+      { type: 'root', name: 'Archivos' },
+      { type: 'customRoot', id: item.id, name: item.title, path: item.path },
+    ])
+  }
+
   const openFolder = (item: DocumentDriveItem) => {
-    if (!category) return
+    if (!driveCategory) return
     setPreview(null)
     setCrumbs((prev) => [
       ...prev,
-      { type: 'folder', category, id: item.id, name: item.title, path: item.path },
+      { type: 'folder', category: driveCategory, id: item.id, name: item.title, path: item.path },
     ])
   }
 
   const goCrumb = (index: number) => {
     setPreview(null)
+    setContratosBlocked(false)
     setCrumbs((prev) => prev.slice(0, index + 1))
   }
 
@@ -233,7 +299,7 @@ export function DocumentDrive() {
       }
 
       if (isPdfItem(target)) {
-        if (target.isLocal && category === 'Contratos') {
+        if (target.isLocal && driveCategory === 'Contratos') {
           const contract = localItems.find((c) => c.id === target.id)
           if (contract) {
             setPreviewError(false)
@@ -248,8 +314,8 @@ export function DocumentDrive() {
         }
         setPreviewError(false)
         setPreview({ kind: 'drive', item: target })
-        if (category) {
-          void logDocumentDriveActivity('viewed', target.fileName ?? target.title, category, target.id)
+        if (driveCategory) {
+          void logDocumentDriveActivity('viewed', target.fileName ?? target.title, driveCategory, target.id)
         }
         return
       }
@@ -263,12 +329,12 @@ export function DocumentDrive() {
   }
 
   const uploadList = async (list: File[]) => {
-    if (!category || readonly) return
+    if (!driveCategory || readonly) return
     setBusy(true)
     setError(null)
     try {
       for (const file of list) {
-        await uploadDocumentDriveFile(file, category, parentId, parentPath)
+        await uploadDocumentDriveFile(file, driveCategory, parentId, parentPath)
       }
       toastSuccess(list.length === 1 ? 'Archivo subido' : `${list.length} archivos subidos`)
       await reload()
@@ -282,17 +348,23 @@ export function DocumentDrive() {
   }
 
   const onUploadFiles = (fileList: FileList | File[]) => {
-    if (readonly || !inCategory) return
+    if (readonly || !inDrive) return
     const list = [...fileList]
     if (list.length === 0) return
     void uploadList(list)
   }
 
   const createFolder = async () => {
-    if (!canCreateFolder || !category || !folderName.trim()) return
+    if (!canCreateFolder || !folderName.trim()) return
     setBusy(true)
     try {
-      await createDocumentDriveFolder(folderName, category, parentId, parentPath)
+      if (atRoot) {
+        await createRootCustomFolder(folderName)
+      } else if (driveCategory) {
+        await createDocumentDriveFolder(folderName, driveCategory, parentId, parentPath)
+      } else {
+        return
+      }
       setFolderOpen(false)
       setFolderName('')
       toastSuccess('Carpeta creada')
@@ -354,8 +426,18 @@ export function DocumentDrive() {
   const previewFileName = preview
     ? preview.kind === 'local' ? preview.contract.fileName : (preview.item.fileName ?? preview.item.title)
     : ''
-  const previewCategoryLabel = category ? ROOT_FOLDER_META[category].label : 'Documento'
+  const previewCategoryLabel = (() => {
+    if (driveCategory === ROOT_CUSTOM_CATEGORY) {
+      const customCrumb = crumbs.find((c) => c.type === 'customRoot')
+      return customCrumb?.name ?? 'Carpeta'
+    }
+    if (driveCategory) {
+      return ROOT_FOLDER_META[driveCategory].label
+    }
+    return 'Documento'
+  })()
   const showPdfSplit = Boolean(
+    canAccessContracts &&
     preview &&
     previewUrl &&
     (preview.kind === 'local' || isPdfItem(preview.item)),
@@ -397,13 +479,13 @@ export function DocumentDrive() {
 
   const driveToolbar = (
       <div className="doc-drive-toolbar">
-        {inCategory && (
+        {inDrive && (
           <label className="contract-search">
             <Search size={15} />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={category === 'Contratos' ? 'Buscar contrato o talento…' : 'Buscar archivo…'}
+              placeholder={driveCategory === 'Contratos' ? 'Buscar contrato o talento…' : 'Buscar archivo…'}
             />
           </label>
         )}
@@ -411,27 +493,25 @@ export function DocumentDrive() {
           <button className="secondary" disabled={loading || busy} onClick={() => void reload()} title="Actualizar">
             <RefreshCw size={16} />
           </button>
-          {inCategory && (
-            <>
-              {canCreateFolder && (
-                <button
-                  className="secondary"
-                  disabled={busy}
-                  title="Nueva carpeta"
-                  onClick={() => setFolderOpen(true)}
-                >
-                  <FolderPlus size={16} /> Nueva carpeta
-                </button>
-              )}
-              <button
-                className="primary"
-                disabled={readonly || busy}
-                title={readonly ? 'Solo lectura' : undefined}
-                onClick={() => fileRef.current?.click()}
-              >
-                <Upload size={16} /> Subir
-              </button>
-            </>
+          {canCreateFolder && (atRoot || inDrive) && (
+            <button
+              className="secondary"
+              disabled={busy}
+              title="Nueva carpeta"
+              onClick={() => setFolderOpen(true)}
+            >
+              <FolderPlus size={16} /> Nueva carpeta
+            </button>
+          )}
+          {inDrive && (
+            <button
+              className="primary"
+              disabled={readonly || busy}
+              title={readonly ? 'Solo lectura' : undefined}
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload size={16} /> Subir
+            </button>
           )}
         </div>
         <input
@@ -481,7 +561,7 @@ export function DocumentDrive() {
                 value={folderName}
                 onChange={(e) => setFolderName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') void createFolder() }}
-                placeholder="Subcarpeta…"
+                placeholder={atRoot ? 'Carpeta en la raíz…' : 'Subcarpeta…'}
               />
             </label>
             <div className="agency-modal-actions">
@@ -492,9 +572,21 @@ export function DocumentDrive() {
         </div>
   ) : null
 
+  const rootFolderHint = canAccessContracts
+    ? 'Directivas, Extras o Contratos'
+    : 'Directivas o Extras'
+
   const driveAlerts = (
     <>
-      {readonly && inCategory && (
+      {contratosBlocked && (
+        <p className="integration-note staff-readonly-banner">No tienes acceso a contratos</p>
+      )}
+      {canCreateFolder && current.type === 'root' && (
+        <p className="integration-note">
+          Abre {rootFolderHint} para crear subcarpetas y subir archivos. El botón «Nueva carpeta» aparece dentro de cada categoría.
+        </p>
+      )}
+      {readonly && inDrive && (
         <p className="integration-note staff-readonly-banner">Modo solo lectura: puedes ver y descargar, pero no subir ni borrar.</p>
       )}
       {error && <p className="integration-note">{error}</p>}
@@ -515,6 +607,16 @@ export function DocumentDrive() {
                 ? 'Cuando el equipo suba archivos, aparecerán aquí.'
                 : 'Arrastra archivos aquí o usa Subir.'}
           </span>
+          {canCreateFolder && (
+            <button className="secondary" disabled={busy} onClick={() => setFolderOpen(true)}>
+              <FolderPlus size={16} /> Nueva carpeta
+            </button>
+          )}
+          {!readonly && (
+            <button className="primary" onClick={() => fileRef.current?.click()}>
+              <Upload size={16} /> Subir archivos
+            </button>
+          )}
         </div>
       )
     }
@@ -557,13 +659,42 @@ export function DocumentDrive() {
     if (current.type === 'root') {
       return (
         <div className="cd-grid">
-          {DOCUMENT_DRIVE_CATEGORIES.map((cat) => (
+          {visibleCategories.map((cat) => (
             <article key={cat} className="cd-tile is-folder">
               <button type="button" className="cd-tile-main" onClick={() => openCategory(cat)}>
                 {cat === 'Contratos' ? <FolderLock size={28} /> : <Folder size={28} />}
                 <b>{ROOT_FOLDER_META[cat].label}</b>
                 <small>{ROOT_FOLDER_META[cat].hint}</small>
               </button>
+            </article>
+          ))}
+          {rootCustomFolders.map((item) => (
+            <article key={item.id} className="cd-tile is-folder">
+              <button type="button" className="cd-tile-main" onClick={() => openCustomRootFolder(item)}>
+                <Folder size={28} />
+                {renamingId === item.id ? (
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={() => void commitRename()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void commitRename()
+                      if (e.key === 'Escape') setRenamingId(null)
+                    }}
+                  />
+                ) : (
+                  <b>{item.title}</b>
+                )}
+                <small>Carpeta{item.createdBy && uploaderNames[item.createdBy] ? ` · ${uploaderNames[item.createdBy]}` : ''}</small>
+              </button>
+              {canCreateFolder && (
+                <div className="cd-tile-actions">
+                  <button type="button" className="icon-btn" title="Renombrar" onClick={() => startRename(item)}><Pencil size={14} /></button>
+                  <button type="button" className="icon-btn" title="Eliminar" onClick={() => void removeItem(item)}><Trash2 size={14} /></button>
+                </div>
+              )}
             </article>
           ))}
         </div>
@@ -581,6 +712,11 @@ export function DocumentDrive() {
                 ? 'Cuando el equipo suba archivos, aparecerán aquí.'
                 : 'Arrastra archivos aquí o usa Subir.'}
           </span>
+          {canCreateFolder && (
+            <button className="secondary" disabled={busy} onClick={() => setFolderOpen(true)}>
+              <FolderPlus size={16} /> Nueva carpeta
+            </button>
+          )}
           {!readonly && (
             <button className="primary" onClick={() => fileRef.current?.click()}>
               <Upload size={16} /> Subir archivos
@@ -678,13 +814,13 @@ export function DocumentDrive() {
   }
 
   const dropHandlers = {
-    onDragEnter: (e: DragEvent) => { e.preventDefault(); if (!readonly && inCategory) setDragging(true) },
+    onDragEnter: (e: DragEvent) => { e.preventDefault(); if (!readonly && inDrive) setDragging(true) },
     onDragOver: (e: DragEvent) => e.preventDefault(),
     onDragLeave: () => setDragging(false),
     onDrop: (e: DragEvent) => {
       e.preventDefault()
       setDragging(false)
-      if (!readonly && inCategory && e.dataTransfer.files.length) onUploadFiles(e.dataTransfer.files)
+      if (!readonly && inDrive && e.dataTransfer.files.length) onUploadFiles(e.dataTransfer.files)
     },
   }
 
@@ -695,13 +831,13 @@ export function DocumentDrive() {
       {driveBreadcrumb}
 
       <div
-        className={`card cd-dropzone doc-drive-zone${inCategory ? ' doc-drive-full' : ''}${dragging ? ' is-dragging' : ''}`}
+        className={`card cd-dropzone doc-drive-zone${inDrive ? ' doc-drive-full' : ''}${dragging ? ' is-dragging' : ''}`}
         {...dropHandlers}
       >
         <div className={`doc-drive-scroll cd-fade-surface${contentFaded ? ' is-faded' : ''}`}>
           {renderGridContent()}
         </div>
-        {dragging && !readonly && inCategory && <div className="cd-drop-hint">Suelta para subir</div>}
+        {dragging && !readonly && inDrive && <div className="cd-drop-hint">Suelta para subir</div>}
       </div>
 
       {folderModal}
@@ -741,8 +877,8 @@ export function DocumentDrive() {
               onClick={() => {
                 if (preview?.kind === 'local') {
                   void logContractActivity('downloaded', preview.contract.fileName, preview.contract.talent?.login)
-                } else if (preview?.kind === 'drive' && category) {
-                  void logDocumentDriveActivity('downloaded', preview.item.fileName ?? preview.item.title, category, preview.item.id)
+                } else if (preview?.kind === 'drive' && driveCategory) {
+                  void logDocumentDriveActivity('downloaded', preview.item.fileName ?? preview.item.title, driveCategory, preview.item.id)
                 }
               }}
             >
@@ -772,6 +908,6 @@ export function DocumentDrive() {
   return drivePanel
 }
 
-export function documentDriveFileCount(): number {
-  return localContracts.length
+export function documentDriveFileCount(includeContracts = true): number {
+  return includeContracts ? localContracts.length : 0
 }
