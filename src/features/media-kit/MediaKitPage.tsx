@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Download, FileText, RefreshCw, Columns2 } from 'lucide-react'
+import { Download, FileText, RefreshCw, Columns2 } from '@/components/icons'
 import { Link } from 'react-router-dom'
 import { useAppStore } from '@/stores/app-store'
 import { isTauri } from '@/services/twitch'

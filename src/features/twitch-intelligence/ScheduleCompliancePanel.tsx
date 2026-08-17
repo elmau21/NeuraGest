@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarCheck, ExternalLink, RefreshCw } from 'lucide-react'
+import { CalendarCheck, ExternalLink, RefreshCw } from '@/components/icons'
 import { Link } from 'react-router-dom'
 import { fetchStreamEvents } from '@/services/metrics'
 import { listCalendarEventsOps } from '@/services/ops'

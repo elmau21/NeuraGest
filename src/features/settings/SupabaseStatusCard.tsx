@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw } from '@/components/icons'
 import { checkSupabaseHealth, type SupabaseHealthStatus } from '@/services/supabase-health'
 
 export function SupabaseStatusCard() {

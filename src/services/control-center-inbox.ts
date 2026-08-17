@@ -16,7 +16,16 @@ export type InboxItemType =
 
 export type InboxPriority = 'urgent' | 'high' | 'medium' | 'low'
 
-export type InboxAction = 'mark_done' | 'assign_role' | 'quick_brief' | 'discord' | 'open'
+export type InboxAction =
+  | 'mark_done'
+  | 'assign_role'
+  | 'quick_brief'
+  | 'discord'
+  | 'open'
+  | 'mark_resolved'
+  | 'unmark_resolved'
+  | 'mark_ignored'
+  | 'unmark_ignored'
 
 export type ControlInboxItem = {
   id: string
@@ -27,6 +36,8 @@ export type ControlInboxItem = {
   href?: string
   taskId?: string
   talentLogin?: string
+  resolved?: boolean
+  ignored?: boolean
   actions: InboxAction[]
 }
 
@@ -95,7 +106,7 @@ export function collectDueTasks(tasks: TaskRecord[], now = new Date()): ControlI
         title: t.title,
         detail: overdue ? `Vencida · ${t.dueDate}` : `Vence hoy · ${t.priority}`,
         priority: taskPriority(t, today),
-        href: '/tareas',
+        href: `/control/tareas?task=${t.id}`,
         taskId: t.id,
         actions: ['mark_done', 'discord', 'open'] as InboxAction[],
       }
@@ -165,20 +176,59 @@ export function collectOpenTryouts(tryouts: NlTryout[]): ControlInboxItem[] {
 }
 
 /** Resumen por talento con huecos de assets (solo si missingCount > 0). */
-export function collectDesignGaps(gaps: TalentChannelGap[], limit = 6): ControlInboxItem[] {
-  return gaps
-    .filter((g) => g.missingCount > 0)
-    .slice(0, limit)
-    .map((g) => ({
-      id: `gap:${g.login}`,
-      type: 'design_gap' as const,
-      title: `Huecos de diseño · ${g.displayName}`,
-      detail: `${g.missingCount} asset${g.missingCount === 1 ? '' : 's'} faltante${g.missingCount === 1 ? '' : 's'}`,
-      priority: (g.missingCount >= 3 ? 'high' : 'medium') as InboxPriority,
-      href: '/diseno/huecos',
-      talentLogin: g.login,
-      actions: ['quick_brief', 'open'] as InboxAction[],
-    }))
+export function collectDesignGaps(
+  gaps: TalentChannelGap[],
+  resolvedLogins: Set<string> = new Set(),
+  ignoredLogins: Set<string> = new Set(),
+  limit = 6,
+): ControlInboxItem[] {
+  const loginKey = (login: string) => login.toLowerCase()
+  const isResolved = (g: TalentChannelGap) => resolvedLogins.has(loginKey(g.login))
+  const isIgnored = (g: TalentChannelGap) => ignoredLogins.has(loginKey(g.login))
+
+  const open = gaps.filter(
+    (g) => g.missingCount > 0 && !isResolved(g) && !isIgnored(g),
+  )
+  const resolved = gaps.filter((g) => g.missingCount > 0 && isResolved(g))
+  const ignored = gaps.filter(
+    (g) => g.missingCount > 0 && isIgnored(g) && !isResolved(g),
+  )
+
+  const mapGap = (
+    g: TalentChannelGap,
+    state: 'open' | 'resolved' | 'ignored',
+  ): ControlInboxItem => ({
+    id: `gap:${g.login}`,
+    type: 'design_gap' as const,
+    title: `Huecos de diseño · ${g.displayName}`,
+    detail:
+      state === 'resolved'
+        ? 'Marcado como resuelto · aún faltan assets en Drive'
+        : state === 'ignored'
+          ? 'Ignorado · sigue pendiente en Drive'
+          : `${g.missingCount} asset${g.missingCount === 1 ? '' : 's'} faltante${g.missingCount === 1 ? '' : 's'}`,
+    priority: (state === 'open'
+      ? g.missingCount >= 3
+        ? 'high'
+        : 'medium'
+      : 'low') as InboxPriority,
+    href: '/diseno/huecos',
+    talentLogin: g.login,
+    resolved: state === 'resolved',
+    ignored: state === 'ignored',
+    actions:
+      state === 'resolved'
+        ? (['unmark_resolved', 'open'] as InboxAction[])
+        : state === 'ignored'
+          ? (['unmark_ignored', 'open'] as InboxAction[])
+          : (['mark_resolved', 'mark_ignored', 'quick_brief', 'open'] as InboxAction[]),
+  })
+
+  return [
+    ...open.slice(0, limit).map((g) => mapGap(g, 'open')),
+    ...ignored.map((g) => mapGap(g, 'ignored')),
+    ...resolved.map((g) => mapGap(g, 'resolved')),
+  ]
 }
 
 /** Scrims / eventos NL del día (calendario local). */
@@ -209,18 +259,32 @@ export function buildControlInbox(input: {
   tryouts: NlTryout[]
   gaps: TalentChannelGap[]
   events: NlEvent[]
+  resolvedGapLogins?: Set<string>
+  ignoredGapLogins?: Set<string>
   now?: Date
 }): ControlInboxItem[] {
   const now = input.now ?? new Date()
+  const resolved = input.resolvedGapLogins ?? new Set<string>()
+  const ignored = input.ignoredGapLogins ?? new Set<string>()
   const items = [
     ...collectDueTasks(input.tasks, now),
     ...collectUncoveredLives(input.talents, input.managers),
     ...collectPendingBriefs(input.briefs),
     ...collectOpenTryouts(input.tryouts),
-    ...collectDesignGaps(input.gaps),
+    ...collectDesignGaps(input.gaps, resolved, ignored),
     ...collectTodayNlEvents(input.events, now),
   ]
-  return items.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || a.title.localeCompare(b.title, 'es'))
+  return items.sort((a, b) => {
+    const rank = (item: ControlInboxItem) => {
+      if (item.resolved) return 2
+      if (item.ignored) return 1
+      return 0
+    }
+    const ra = rank(a)
+    const rb = rank(b)
+    if (ra !== rb) return ra - rb
+    return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || a.title.localeCompare(b.title, 'es')
+  })
 }
 
 export function buildOpsAlerts(input: {

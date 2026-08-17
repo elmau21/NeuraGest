@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowRightLeft, Check, Plus, RefreshCw } from 'lucide-react'
+import { ArrowRightLeft, Check, Plus, RefreshCw } from '@/components/icons'
 import { listAppUsers, type AppUserRecord } from '@/services/app-users'
 import { assignTalentManager, listDbTalents, listTalentManagers, type DbTalent, type TalentManagerRecord } from '@/services/agency'
 import {

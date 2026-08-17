@@ -1,4 +1,4 @@
-import { AlertTriangle, Info, Radio, Tag, TrendingDown } from 'lucide-react'
+import { AlertTriangle, Info, Radio, Tag, TrendingDown } from '@/components/icons'
 import type { EventSubStatus, StreakIndicator } from '@/services/metrics'
 
 const iconByType = {

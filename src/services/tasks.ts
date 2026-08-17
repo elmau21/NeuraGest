@@ -16,11 +16,17 @@ export type TaskRecord = {
   status: TaskStatus
   priority: Priority
   assignee: string
+  assigneeId?: string
+  assignedBy?: string
+  assignedById?: string
   dueDate?: string
   tags: string[]
+  category: string
   estimate: number
   position: number
   startsAt?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export type SubtaskRecord = {
@@ -51,34 +57,92 @@ export type AttachmentRecord = {
 
 const ATTACHMENTS_BUCKET = 'task-attachments'
 
-function mapTask(row: Record<string, unknown>): TaskRecord {
+type UserLabelRow = { display_name?: string | null } | null
+
+function userLabel(row: UserLabelRow, fallback = 'Sin asignar'): string {
+  const name = row?.display_name?.trim()
+  return name || fallback
+}
+
+async function loadUserLabels(userIds: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  if (!supabase || userIds.length === 0) return map
+  const unique = [...new Set(userIds)]
+  const { data } = await supabase
+    .from('users')
+    .select('id,display_name')
+    .in('id', unique)
+  for (const row of data ?? []) {
+    map.set(row.id, userLabel({ display_name: row.display_name }))
+  }
+  return map
+}
+
+function mapTask(
+  row: Record<string, unknown>,
+  assigneeByTask: Map<string, { userId: string; label: string }>,
+  userLabels: Map<string, string>,
+): TaskRecord {
   const statusId = String(row.status_id ?? '')
   const priorityId = String(row.priority_id ?? '')
+  const id = String(row.id)
+  const assignment = assigneeByTask.get(id)
+  const assignedById = row.assigned_by ? String(row.assigned_by) : undefined
   return {
-    id: String(row.id),
+    id,
     title: String(row.title ?? ''),
     description: String(row.description ?? ''),
     status: (STATUS_BY_ID[statusId] ?? 'backlog') as TaskStatus,
     priority: (PRIORITY_BY_ID[priorityId] ?? 'medium') as Priority,
-    assignee: 'Equipo',
+    assignee: assignment?.label ?? 'Sin asignar',
+    assigneeId: assignment?.userId,
+    assignedBy: assignedById ? userLabels.get(assignedById) ?? 'Equipo' : undefined,
+    assignedById,
     dueDate: row.due_at ? String(row.due_at).slice(0, 10) : undefined,
-    tags: ['Operaciones'],
+    tags: row.category ? [String(row.category)] : ['General'],
+    category: String(row.category ?? 'General'),
     estimate: Number(row.estimate_minutes ?? 0) / 60 || 1,
     position: Number(row.position ?? 0),
     startsAt: row.starts_at ? String(row.starts_at) : undefined,
+    createdAt: row.created_at ? String(row.created_at) : undefined,
+    updatedAt: row.updated_at ? String(row.updated_at) : undefined,
   }
+}
+
+async function loadAssigneeMap(taskIds: string[]): Promise<Map<string, { userId: string; label: string }>> {
+  const map = new Map<string, { userId: string; label: string }>()
+  if (!supabase || taskIds.length === 0) return map
+  const { data } = await supabase
+    .from('task_assignments')
+    .select('task_id,user_id,users(display_name)')
+    .in('task_id', taskIds)
+  for (const row of data ?? []) {
+    const users = row.users as UserLabelRow
+    map.set(row.task_id, {
+      userId: row.user_id,
+      label: userLabel(users),
+    })
+  }
+  return map
 }
 
 export async function fetchTasks(): Promise<TaskRecord[]> {
   if (!supabase) return []
   const { data, error } = await supabase
     .from('tasks')
-    .select('id,title,description,status_id,priority_id,due_at,starts_at,estimate_minutes,position')
+    .select(`
+      id,title,description,status_id,priority_id,due_at,starts_at,estimate_minutes,position,
+      category,assigned_by,created_at,updated_at
+    `)
     .eq('organization_id', DEFAULT_ORG_ID)
     .is('deleted_at', null)
     .order('position', { ascending: true })
   if (error || !data) return []
-  return data.map((row) => mapTask(row as Record<string, unknown>))
+  const assigneeByTask = await loadAssigneeMap(data.map((row) => row.id))
+  const userLabels = await loadUserLabels(
+    data.map((row) => row.assigned_by).filter((id): id is string => Boolean(id)),
+  )
+  return data.map((row) => mapTask(row as Record<string, unknown>, assigneeByTask, userLabels))
 }
 
 export async function createTask(input: Partial<TaskRecord>): Promise<TaskRecord | null> {
@@ -98,12 +162,22 @@ export async function createTask(input: Partial<TaskRecord>): Promise<TaskRecord
       starts_at: input.startsAt ? new Date(input.startsAt).toISOString() : null,
       estimate_minutes: Math.round((input.estimate ?? 1) * 60),
       position: input.position ?? Date.now(),
+      category: input.category ?? 'General',
       created_by: user?.id ?? null,
+      assigned_by: user?.id ?? null,
     })
-    .select('id,title,description,status_id,priority_id,due_at,starts_at,estimate_minutes,position')
+    .select(`
+      id,title,description,status_id,priority_id,due_at,starts_at,estimate_minutes,position,
+      category,assigned_by,created_at,updated_at
+    `)
     .single()
   if (error || !data) return null
-  const task = mapTask(data as Record<string, unknown>)
+  if (input.assigneeId) {
+    await supabase.from('task_assignments').insert({ task_id: data.id, user_id: input.assigneeId })
+  }
+  const assigneeByTask = await loadAssigneeMap([data.id])
+  const userLabels = await loadUserLabels(data.assigned_by ? [data.assigned_by] : [])
+  const task = mapTask(data as Record<string, unknown>, assigneeByTask, userLabels)
   await logActivity('task', 'created', { title: task.title }, task.id)
   return task
 }
@@ -119,11 +193,13 @@ export async function updateTask(id: string, patch: Partial<TaskRecord>): Promis
     starts_at?: string | null
     estimate_minutes?: number
     position?: number
+    category?: string
   } = {}
   if (patch.title !== undefined) payload.title = patch.title
   if (patch.description !== undefined) payload.description = patch.description
   if (patch.status) payload.status_id = TASK_STATUS_IDS[patch.status]
   if (patch.priority) payload.priority_id = TASK_PRIORITY_IDS[patch.priority]
+  if (patch.category !== undefined) payload.category = patch.category
   if (patch.dueDate !== undefined) payload.due_at = patch.dueDate ? new Date(patch.dueDate).toISOString() : null
   if (patch.startsAt !== undefined) payload.starts_at = patch.startsAt ? new Date(patch.startsAt).toISOString() : null
   if (patch.estimate !== undefined) payload.estimate_minutes = Math.round(patch.estimate * 60)
@@ -262,6 +338,43 @@ export async function fetchAttachments(taskId: string): Promise<AttachmentRecord
       storagePath: row.storage_path,
       url: signed.data?.signedUrl,
     }
+  }))
+}
+
+export async function assignTask(taskId: string, userId: string | null, assigneeLabel?: string): Promise<boolean> {
+  if (!supabase) return false
+  const { error: clearError } = await supabase.from('task_assignments').delete().eq('task_id', taskId)
+  if (clearError) return false
+  if (userId) {
+    const { error: insertError } = await supabase.from('task_assignments').insert({ task_id: taskId, user_id: userId })
+    if (insertError) return false
+  }
+  await logActivity('task', 'reassigned', { taskId, assignee: assigneeLabel ?? userId }, taskId)
+  return true
+}
+
+export type TaskActivityRecord = {
+  id: number
+  action: string
+  createdAt: string
+  metadata: Record<string, unknown>
+}
+
+export async function fetchTaskActivity(taskId: string, limit = 15): Promise<TaskActivityRecord[]> {
+  if (!supabase) return []
+  const { data } = await supabase
+    .from('activity_logs')
+    .select('id,action,metadata,created_at')
+    .eq('organization_id', DEFAULT_ORG_ID)
+    .eq('entity_type', 'task')
+    .eq('entity_id', taskId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    action: row.action,
+    createdAt: row.created_at ?? new Date().toISOString(),
+    metadata: (row.metadata as Record<string, unknown>) ?? {},
   }))
 }
 

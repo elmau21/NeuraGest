@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ExternalLink, Sparkles } from 'lucide-react'
+import { ExternalLink, Sparkles } from '@/components/icons'
 import { listPipelineItems, type PipelineItem } from '@/services/agency'
 import type { MetricSnapshot, StreamEvent } from '@/services/metrics'
 import { isTauri } from '@/services/twitch'

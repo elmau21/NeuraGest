@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Radio } from 'lucide-react'
+import { Radio } from '@/components/icons'
 import { OAuthWaitingPanel } from '@/features/auth/OAuthWaitingPanel'
 import { neuraliveLogotype } from '@/assets/brand'
 import { useAuthStore } from '@/stores/auth-store'

@@ -33,6 +33,7 @@ export const ROLE_MANAGER_ROLES: AppRole[] = ['owner', 'dev', 'assistant']
 
 export type AppUserRecord = {
   id: string
+  authUserId?: string
   twitchLogin: string
   displayName?: string
   avatarUrl?: string

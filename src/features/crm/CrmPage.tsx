@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertOctagon, CalendarDays, CheckSquare, Clock, Plus, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react'
+import { AlertOctagon, CalendarDays, CheckSquare, Clock, Plus, RefreshCw, ShieldAlert, Trash2 } from '@/components/icons'
 import { Link } from 'react-router-dom'
 import {
   deleteSponsorshipDeal,

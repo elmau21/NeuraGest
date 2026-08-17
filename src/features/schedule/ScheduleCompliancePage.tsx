@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, CalendarCheck, RefreshCw } from 'lucide-react'
+import { AlertTriangle, CalendarCheck, RefreshCw } from '@/components/icons'
 import { isTauri } from '@/services/twitch'
 import { fetchStreamEvents } from '@/services/metrics'
 import { listCalendarEventsOps } from '@/services/ops'

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ExternalLink, RefreshCw, Trophy } from 'lucide-react'
+import { ExternalLink, RefreshCw, Trophy } from '@/components/icons'
 import { fetchWeeklyClips, type WeeklyClip } from '@/services/twitch-intelligence'
 import { isTauri } from '@/services/twitch'
 

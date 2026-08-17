@@ -15,6 +15,10 @@ export type OpsDayNote = {
   id: string
   noteDate: string
   body: string
+  ownerUserId: string
+  ownerLogin: string
+  assistantUserId?: string
+  assistantLogin?: string
   updatedBy?: string
   updatedByLogin?: string
   updatedAt: string
@@ -48,6 +52,10 @@ function mapNote(row: Record<string, unknown>): OpsDayNote {
     id: String(row.id),
     noteDate: String(row.note_date).slice(0, 10),
     body: String(row.body ?? ''),
+    ownerUserId: String(row.owner_user_id ?? ''),
+    ownerLogin: String(row.owner_login ?? ''),
+    assistantUserId: row.assistant_user_id ? String(row.assistant_user_id) : undefined,
+    assistantLogin: row.assistant_login ? String(row.assistant_login) : undefined,
     updatedBy: row.updated_by ? String(row.updated_by) : undefined,
     updatedByLogin: row.updated_by_login ? String(row.updated_by_login) : undefined,
     updatedAt: String(row.updated_at ?? ''),
@@ -111,12 +119,16 @@ export async function clearOpsCoverage(date = opsTodayDate()): Promise<boolean> 
   return !error
 }
 
-export async function fetchOpsDayNote(date = opsTodayDate()): Promise<OpsDayNote | null> {
-  if (!supabase) return null
+export async function fetchOpsDayNote(
+  ownerUserId: string,
+  date = opsTodayDate(),
+): Promise<OpsDayNote | null> {
+  if (!supabase || !ownerUserId) return null
   const { data, error } = await supabase
     .from('ops_day_notes')
-    .select('id,note_date,body,updated_by,updated_by_login,updated_at')
+    .select('id,note_date,body,owner_user_id,owner_login,assistant_user_id,assistant_login,updated_by,updated_by_login,updated_at')
     .eq('organization_id', DEFAULT_ORG_ID)
+    .eq('owner_user_id', ownerUserId)
     .eq('note_date', date)
     .maybeSingle()
   if (error || !data) return null
@@ -125,23 +137,31 @@ export async function fetchOpsDayNote(date = opsTodayDate()): Promise<OpsDayNote
 
 export async function saveOpsDayNote(input: {
   body: string
+  ownerUserId: string
+  ownerLogin: string
+  assistantUserId?: string
+  assistantLogin?: string
   login?: string
   date?: string
 }): Promise<OpsDayNote | null> {
-  if (!supabase) return null
+  if (!supabase || !input.ownerUserId) return null
   const date = input.date ?? opsTodayDate()
   const { data: auth } = await supabase.auth.getUser()
   const payload = {
     organization_id: DEFAULT_ORG_ID,
     note_date: date,
     body: input.body,
+    owner_user_id: input.ownerUserId,
+    owner_login: input.ownerLogin.trim().toLowerCase(),
+    assistant_user_id: input.assistantUserId ?? null,
+    assistant_login: input.assistantLogin?.trim().toLowerCase() ?? null,
     updated_by: auth.user?.id ?? null,
     updated_by_login: input.login ?? null,
   }
   const { data, error } = await supabase
     .from('ops_day_notes')
-    .upsert(payload, { onConflict: 'organization_id,note_date' })
-    .select('id,note_date,body,updated_by,updated_by_login,updated_at')
+    .upsert(payload, { onConflict: 'organization_id,owner_user_id,note_date' })
+    .select('id,note_date,body,owner_user_id,owner_login,assistant_user_id,assistant_login,updated_by,updated_by_login,updated_at')
     .single()
   if (error || !data) return null
   return mapNote(data as Record<string, unknown>)

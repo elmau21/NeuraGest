@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { Radio, RefreshCw, Users } from 'lucide-react'
+import { Radio, RefreshCw, Users } from '@/components/icons'
 import { useAppStore } from '@/stores/app-store'
 import { isTauri } from '@/services/twitch'
 import { useMetricHistory } from '@/hooks/useMetricHistory'

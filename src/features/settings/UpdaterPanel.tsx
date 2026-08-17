@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw } from '@/components/icons'
 import { checkForAppUpdate, installAppUpdate, type UpdateCheckResult } from '@/services/updater'
 
 export function UpdaterPanel() {

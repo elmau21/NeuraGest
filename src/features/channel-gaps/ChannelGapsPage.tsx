@@ -4,10 +4,11 @@ import {
   CheckCircle2,
   CircleAlert,
   CircleDashed,
+  EyeOff,
   FolderOpen,
   FolderPlus,
   RefreshCw,
-} from 'lucide-react'
+} from '@/components/icons'
 import { listDbTalents } from '@/services/agency'
 import {
   createDriveFolder,
@@ -16,6 +17,16 @@ import {
   type CreativeDriveItem,
 } from '@/services/creative-drive'
 import { buildChannelGaps, type TalentChannelGap } from '@/services/channel-gaps'
+import {
+  ignoreLoginSet,
+  listDesignGapIgnores,
+  listDesignGapResolutions,
+  markDesignGapIgnored,
+  markDesignGapResolved,
+  resolutionLoginSet,
+  unmarkDesignGapIgnored,
+  unmarkDesignGapResolved,
+} from '@/services/design-gap-resolutions'
 import { TWITCH_RULES_BLURB } from '@/services/twitch-asset-rules'
 import { isTauri } from '@/services/twitch'
 import { canMutateDesign } from '@/services/permissions'
@@ -40,6 +51,12 @@ export function ChannelGapsPage() {
   const [dbTalents, setDbTalents] = useState<Awaited<ReturnType<typeof listDbTalents>>>([])
   const [loading, setLoading] = useState(true)
   const [busyLogin, setBusyLogin] = useState<string | null>(null)
+  const [busyResolveLogin, setBusyResolveLogin] = useState<string | null>(null)
+  const [busyIgnoreLogin, setBusyIgnoreLogin] = useState<string | null>(null)
+  const [resolvedLogins, setResolvedLogins] = useState<Set<string>>(new Set())
+  const [ignoredLogins, setIgnoredLogins] = useState<Set<string>>(new Set())
+  const [showResolved, setShowResolved] = useState(false)
+  const [showIgnored, setShowIgnored] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
@@ -47,12 +64,16 @@ export function ChannelGapsPage() {
     setLoading(true)
     setError(null)
     try {
-      const [items, talents] = await Promise.all([
+      const [items, talents, resolutions, ignores] = await Promise.all([
         listAllDriveItems(),
         listDbTalents().catch(() => []),
+        listDesignGapResolutions().catch(() => []),
+        listDesignGapIgnores().catch(() => []),
       ])
       setDriveItems(items)
       setDbTalents(talents)
+      setResolvedLogins(resolutionLoginSet(resolutions))
+      setIgnoredLogins(ignoreLoginSet(ignores))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -85,6 +106,101 @@ export function ChannelGapsPage() {
       findFolder: (login, displayName) => findTalentRootFolder(driveItems, login, displayName),
     })
   }, [dbTalents, driveItems, twitchTalents])
+
+  const loginKey = (login: string) => login.toLowerCase()
+
+  const visibleGaps = useMemo(() => {
+    const open = gaps.filter(
+      (g) => !resolvedLogins.has(loginKey(g.login)) && !ignoredLogins.has(loginKey(g.login)),
+    )
+    const resolved = gaps.filter((g) => resolvedLogins.has(loginKey(g.login)))
+    const ignored = gaps.filter(
+      (g) => ignoredLogins.has(loginKey(g.login)) && !resolvedLogins.has(loginKey(g.login)),
+    )
+    let result = open
+    if (showIgnored) result = [...result, ...ignored]
+    if (showResolved) result = [...result, ...resolved]
+    return result
+  }, [gaps, resolvedLogins, ignoredLogins, showResolved, showIgnored])
+
+  const resolvedCount = useMemo(
+    () => gaps.filter((g) => resolvedLogins.has(loginKey(g.login))).length,
+    [gaps, resolvedLogins],
+  )
+
+  const ignoredCount = useMemo(
+    () =>
+      gaps.filter(
+        (g) => ignoredLogins.has(loginKey(g.login)) && !resolvedLogins.has(loginKey(g.login)),
+      ).length,
+    [gaps, ignoredLogins, resolvedLogins],
+  )
+
+  const toggleResolved = async (row: TalentChannelGap, resolve: boolean) => {
+    if (readonly) return
+    setBusyResolveLogin(row.login)
+    try {
+      if (resolve) {
+        await markDesignGapResolved({
+          talentLogin: row.login,
+          talentId: row.talentId,
+          displayName: row.displayName,
+        })
+        setResolvedLogins((prev) => new Set([...prev, row.login.toLowerCase()]))
+        setIgnoredLogins((prev) => {
+          const next = new Set(prev)
+          next.delete(row.login.toLowerCase())
+          return next
+        })
+        toastSuccess(`@${row.login} marcado como resuelto.`)
+      } else {
+        await unmarkDesignGapResolved(row.login, row.displayName)
+        setResolvedLogins((prev) => {
+          const next = new Set(prev)
+          next.delete(row.login.toLowerCase())
+          return next
+        })
+        toastSuccess(`@${row.login} vuelve a la lista activa.`)
+      }
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'No se pudo actualizar el estado.')
+    } finally {
+      setBusyResolveLogin(null)
+    }
+  }
+
+  const toggleIgnored = async (row: TalentChannelGap, ignore: boolean) => {
+    if (readonly) return
+    setBusyIgnoreLogin(row.login)
+    try {
+      if (ignore) {
+        await markDesignGapIgnored({
+          talentLogin: row.login,
+          talentId: row.talentId,
+          displayName: row.displayName,
+        })
+        setIgnoredLogins((prev) => new Set([...prev, row.login.toLowerCase()]))
+        setResolvedLogins((prev) => {
+          const next = new Set(prev)
+          next.delete(row.login.toLowerCase())
+          return next
+        })
+        toastSuccess(`@${row.login} movido a ignorados (pendientes).`)
+      } else {
+        await unmarkDesignGapIgnored(row.login, row.displayName)
+        setIgnoredLogins((prev) => {
+          const next = new Set(prev)
+          next.delete(row.login.toLowerCase())
+          return next
+        })
+        toastSuccess(`@${row.login} vuelve a la lista activa.`)
+      }
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'No se pudo actualizar el estado.')
+    } finally {
+      setBusyIgnoreLogin(null)
+    }
+  }
 
   const ensureFolder = async (row: TalentChannelGap) => {
     if (readonly) return
@@ -134,6 +250,22 @@ export function ChannelGapsPage() {
           </p>
         </div>
         <div className="page-actions">
+          {resolvedCount > 0 ? (
+            <button
+              className={`secondary${showResolved ? ' active' : ''}`}
+              onClick={() => setShowResolved((v) => !v)}
+            >
+              <CheckCircle2 size={16} /> Resueltos ({resolvedCount})
+            </button>
+          ) : null}
+          {ignoredCount > 0 ? (
+            <button
+              className={`secondary ignored${showIgnored ? ' active' : ''}`}
+              onClick={() => setShowIgnored((v) => !v)}
+            >
+              <EyeOff size={16} /> Ignorados ({ignoredCount})
+            </button>
+          ) : null}
           <button className="secondary" disabled={loading} onClick={() => void reload()}>
             <RefreshCw size={16} /> Actualizar
           </button>
@@ -153,10 +285,15 @@ export function ChannelGapsPage() {
         <div className="card"><p className="empty-state">Revisando roster y archivos…</p></div>
       ) : gaps.length === 0 ? (
         <div className="card"><p className="empty-state">No hay talentos en el roster.</p></div>
+      ) : visibleGaps.length === 0 ? (
+        <div className="card"><p className="empty-state">No hay huecos pendientes. Activa «Resueltos» o «Ignorados» para revisar los marcados.</p></div>
       ) : (
         <div className="dg-gap-list">
-          {gaps.map((row) => (
-            <article key={row.login} className="card dg-gap-card">
+          {visibleGaps.map((row) => {
+            const isResolved = resolvedLogins.has(row.login.toLowerCase())
+            const isIgnored = ignoredLogins.has(row.login.toLowerCase()) && !isResolved
+            return (
+            <article key={row.login} className={`card dg-gap-card${isResolved ? ' is-resolved' : ''}${isIgnored ? ' is-ignored' : ''}`}>
               <header className="dg-gap-head">
                 <div className="dg-gap-talent">
                   {row.avatar ? (
@@ -170,11 +307,21 @@ export function ChannelGapsPage() {
                   </div>
                 </div>
                 <div className="dg-gap-meta">
-                  <span className={row.missingCount > 0 ? 'dg-badge warn' : 'dg-badge ok'}>
-                    {row.missingCount > 0
-                      ? `${row.missingCount} hueco${row.missingCount === 1 ? '' : 's'}`
-                      : 'Completo'}
-                  </span>
+                  {isResolved ? (
+                    <span className="dg-badge ok">
+                      <CheckCircle2 size={12} /> Resuelto
+                    </span>
+                  ) : isIgnored ? (
+                    <span className="dg-badge ignored">
+                      <EyeOff size={12} /> Ignorado
+                    </span>
+                  ) : (
+                    <span className={row.missingCount > 0 ? 'dg-badge warn' : 'dg-badge ok'}>
+                      {row.missingCount > 0
+                        ? `${row.missingCount} hueco${row.missingCount === 1 ? '' : 's'}`
+                        : 'Completo'}
+                    </span>
+                  )}
                   <span className="dg-badge muted">{row.readyCount}/{row.slots.length} listos</span>
                 </div>
               </header>
@@ -200,6 +347,43 @@ export function ChannelGapsPage() {
               </ul>
 
               <footer className="dg-gap-actions">
+                {!readonly && row.missingCount > 0 ? (
+                  isResolved ? (
+                    <button
+                      className="secondary"
+                      disabled={busyResolveLogin === row.login}
+                      onClick={() => void toggleResolved(row, false)}
+                    >
+                      <CircleDashed size={15} /> Quitar resuelto
+                    </button>
+                  ) : isIgnored ? (
+                    <button
+                      className="secondary"
+                      disabled={busyIgnoreLogin === row.login}
+                      onClick={() => void toggleIgnored(row, false)}
+                    >
+                      <EyeOff size={15} /> Quitar de ignorados
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        className="secondary"
+                        disabled={busyResolveLogin === row.login}
+                        onClick={() => void toggleResolved(row, true)}
+                      >
+                        <CheckCircle2 size={15} /> Marcar resuelto
+                      </button>
+                      <button
+                        className="secondary"
+                        disabled={busyIgnoreLogin === row.login}
+                        onClick={() => void toggleIgnored(row, true)}
+                        title="Ocultar de la cola activa; sigue pendiente en Drive"
+                      >
+                        <EyeOff size={15} /> Ignorar
+                      </button>
+                    </>
+                  )
+                ) : null}
                 <button
                   className="secondary"
                   disabled={!row.folder}
@@ -220,7 +404,7 @@ export function ChannelGapsPage() {
                 )}
               </footer>
             </article>
-          ))}
+          )})}
         </div>
       )}
     </>

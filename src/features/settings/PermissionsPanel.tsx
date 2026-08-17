@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, RefreshCw, Shield, UserRound } from 'lucide-react'
+import { AlertTriangle, Loader2, RefreshCw, Shield, UserRound } from '@/components/icons'
 import {
   ALL_APP_ROLES,
   type AppRole,
@@ -32,6 +32,27 @@ function roleLabel(role: AppRole): string {
     player: 'Jugador',
   }
   return labels[role]
+}
+
+function userInitials(user: Pick<AppUserRecord, 'displayName' | 'twitchLogin'>): string {
+  const source = user.displayName?.trim() || user.twitchLogin
+  return source.slice(0, 2).toUpperCase()
+}
+
+function UserProfile({ user }: { user: AppUserRecord }) {
+  return (
+    <div className="settings-profile-chip permissions-user-profile">
+      <div className="settings-profile-chip-avatar" aria-hidden>
+        {user.avatarUrl
+          ? <img src={user.avatarUrl} alt="" />
+          : <span>{userInitials(user)}</span>}
+      </div>
+      <div className="settings-profile-chip-info">
+        <b>{user.displayName ?? user.twitchLogin}</b>
+        <span>@{user.twitchLogin}</span>
+      </div>
+    </div>
+  )
 }
 
 type PermissionsPanelProps = {
@@ -125,90 +146,98 @@ export function PermissionsPanel({ compact = false, hideRoles = [] }: Permission
     }
   }
 
+  const rootClass = [
+    'permissions-panel',
+    compact ? 'permissions-panel-compact' : 'card settings-panel-card',
+  ].join(' ')
+
   return (
-    <div className={`permissions-panel${compact ? ' permissions-panel-compact' : ''}`}>
+    <div className={rootClass}>
       {!compact && (
-        <div className="permissions-head">
+        <div className="settings-panel-head permissions-panel-head">
           <div>
-            <h3><Shield size={16}/> Administración de permisos</h3>
+            <h3><Shield size={16} strokeWidth={1.6} /> Administración de permisos</h3>
             <p>Gestiona roles (Owner, Asistente, Manager, Staff, Diseño, Liga…) para cuentas Twitch registradas.</p>
           </div>
-          <button className="secondary" disabled={loading} onClick={() => void load()}>
-            <RefreshCw size={14}/> Actualizar
+          <button type="button" className="secondary" disabled={loading} onClick={() => void load()}>
+            <RefreshCw size={14} /> Actualizar
           </button>
         </div>
       )}
       {compact && (
-        <div className="permissions-head permissions-head-compact">
-          <button className="secondary" disabled={loading} onClick={() => void load()}>
-            <RefreshCw size={14}/> Actualizar
+        <div className="permissions-toolbar">
+          <button type="button" className="secondary" disabled={loading} onClick={() => void load()}>
+            <RefreshCw size={14} /> Actualizar
           </button>
         </div>
       )}
 
-      {error && <p className="integration-note permissions-error"><AlertTriangle size={13}/> {error}</p>}
+      {error && <p className="integration-note permissions-error"><AlertTriangle size={13} /> {error}</p>}
 
       {loading ? (
-        <p className="empty-state">Cargando usuarios…</p>
+        <p className="permissions-loading">
+          <Loader2 size={14} className="spinning" aria-hidden /> Cargando usuarios…
+        </p>
       ) : users.length === 0 ? (
         <div className="permissions-empty">
-          <UserRound size={28}/>
+          <UserRound size={28} strokeWidth={1.6} />
           <b>Aún no hay otros usuarios registrados</b>
           <p>Cuando alguien inicie sesión con Twitch en NeuraGest, aparecerá aquí automáticamente. Puedes asignarle roles desde esta pantalla.</p>
           <small>Sesión actual: @{session?.login ?? '—'}</small>
         </div>
       ) : (
-        <div className="permissions-table">
-          <div className="permissions-table-head">
+        <div className="permissions-list">
+          <div className="permissions-list-head" aria-hidden>
             <span>Usuario</span>
             <span>Roles</span>
             <span>Última sesión</span>
           </div>
           {users.map((user) => (
-            <div className="permissions-row" key={user.id}>
-              <div className="permissions-user">
-                {user.avatarUrl
-                  ? <img src={user.avatarUrl} alt="" />
-                  : <div className="avatar-placeholder">{(user.displayName ?? user.twitchLogin).slice(0, 2).toUpperCase()}</div>}
-                <div>
-                  <b>{user.displayName ?? user.twitchLogin}</b>
-                  <span>@{user.twitchLogin}</span>
+            <article className="permissions-user-row" key={user.id}>
+              <div className="permissions-user-col">
+                <UserProfile user={user} />
+              </div>
+              <div className="permissions-roles-col">
+                <span className="permissions-col-label">Roles</span>
+                <div className="permissions-roles">
+                  {visibleRoles.map((role) => {
+                    const active = user.roles.includes(role)
+                    const ownerLocked = role === 'owner' && !canAssignOwner
+                    const devLocked = role === 'dev' && !canAssignDev
+                    const strongLocked = ownerLocked || devLocked
+                    return (
+                      <button
+                        type="button"
+                        key={role}
+                        className={`permissions-role-chip${active ? ' active' : ''}${strongLocked ? ' locked' : ''}`}
+                        disabled={busyUserId === user.id || strongLocked}
+                        onClick={() => void toggleRole(user, role)}
+                        title={
+                          ownerLocked
+                            ? 'Solo un owner puede gestionar este rol'
+                            : devLocked
+                              ? 'Solo un owner o dev puede gestionar este rol'
+                              : active
+                                ? `Quitar ${roleLabel(role)}`
+                                : `Asignar ${roleLabel(role)}`
+                        }
+                      >
+                        {roleLabel(role)}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
-              <div className="permissions-roles">
-                {visibleRoles.map((role) => {
-                  const active = user.roles.includes(role)
-                  const ownerLocked = role === 'owner' && !canAssignOwner
-                  const devLocked = role === 'dev' && !canAssignDev
-                  const strongLocked = ownerLocked || devLocked
-                  return (
-                    <button
-                      key={role}
-                      className={`role-chip ${active ? 'active' : ''}`}
-                      disabled={busyUserId === user.id || strongLocked}
-                      onClick={() => void toggleRole(user, role)}
-                      title={
-                        ownerLocked
-                          ? 'Solo un owner puede gestionar este rol'
-                          : devLocked
-                            ? 'Solo un owner o dev puede gestionar este rol'
-                            : active
-                              ? `Quitar ${roleLabel(role)}`
-                              : `Asignar ${roleLabel(role)}`
-                      }
-                    >
-                      {roleLabel(role)}
-                    </button>
-                  )
-                })}
+              <div className="permissions-seen-col">
+                <span className="permissions-col-label">Última sesión</span>
+                <time className="permissions-seen" dateTime={user.lastSeenAt}>
+                  {new Date(user.lastSeenAt).toLocaleString('es-MX', {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                  })}
+                </time>
               </div>
-              <span className="permissions-seen">
-                {new Date(user.lastSeenAt).toLocaleString('es-MX', {
-                  dateStyle: 'short',
-                  timeStyle: 'short',
-                })}
-              </span>
-            </div>
+            </article>
           ))}
         </div>
       )}

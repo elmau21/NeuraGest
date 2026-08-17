@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { KeyRound, Trash2 } from 'lucide-react'
+import { KeyRound, Trash2 } from '@/components/icons'
 import {
   deleteHelixProfile,
   getActiveHelixProfile,

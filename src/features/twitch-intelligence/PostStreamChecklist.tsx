@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CheckSquare, Radio } from 'lucide-react'
+import { CheckSquare, Radio } from '@/components/icons'
 import { listen } from '@tauri-apps/api/event'
 import { fetchStreamEvents } from '@/services/metrics'
 import { isTauri } from '@/services/twitch'

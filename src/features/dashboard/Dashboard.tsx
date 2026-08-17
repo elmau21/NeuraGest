@@ -10,7 +10,7 @@ import {
   Search,
   Users,
   WifiOff,
-} from 'lucide-react'
+} from '@/components/icons'
 import {
   Bar,
   BarChart,

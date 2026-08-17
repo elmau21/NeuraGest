@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Volume2 } from 'lucide-react'
+import { Volume2 } from '@/components/icons'
 import {
   getLiveSoundSettings,
   playLiveOffBeep,

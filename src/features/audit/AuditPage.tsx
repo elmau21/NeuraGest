@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { RefreshCw, Shield } from 'lucide-react'
+import { RefreshCw, Shield } from '@/components/icons'
 import { Navigate } from 'react-router-dom'
 import { AUDIT_FILTER_LABELS, canViewAudit, fetchAuditActivity, type AuditFilter } from '@/services/audit'
 import type { ActivityItem } from '@/services/activity'

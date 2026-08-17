@@ -5,7 +5,7 @@ import {
   FileSpreadsheet,
   FileText,
   Minus,
-} from 'lucide-react'
+} from '@/components/icons'
 import {
   Bar,
   BarChart,

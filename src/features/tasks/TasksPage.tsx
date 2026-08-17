@@ -11,7 +11,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { Plus } from 'lucide-react'
+import { Plus } from '@/components/icons'
 import { useTasksStore } from '@/stores/tasks-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { canMutate } from '@/services/permissions'

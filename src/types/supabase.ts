@@ -555,6 +555,114 @@ export type Database = {
         }
         Relationships: []
       }
+      design_gap_resolutions: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string
+          organization_id: string
+          resolved_at: string
+          resolved_by: string | null
+          resolved_by_login: string | null
+          talent_id: string | null
+          talent_login: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string
+          organization_id: string
+          resolved_at?: string
+          resolved_by?: string | null
+          resolved_by_login?: string | null
+          talent_id?: string | null
+          talent_login: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string
+          organization_id?: string
+          resolved_at?: string
+          resolved_by?: string | null
+          resolved_by_login?: string | null
+          talent_id?: string | null
+          talent_login?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "design_gap_resolutions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_gap_resolutions_talent_id_fkey"
+            columns: ["talent_id"]
+            isOneToOne: false
+            referencedRelation: "talents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      design_gap_ignores: {
+        Row: {
+          created_at: string
+          id: string
+          ignored_at: string
+          ignored_by: string | null
+          ignored_by_login: string | null
+          notes: string
+          organization_id: string
+          talent_id: string | null
+          talent_login: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ignored_at?: string
+          ignored_by?: string | null
+          ignored_by_login?: string | null
+          notes?: string
+          organization_id: string
+          talent_id?: string | null
+          talent_login: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ignored_at?: string
+          ignored_by?: string | null
+          ignored_by_login?: string | null
+          notes?: string
+          organization_id?: string
+          talent_id?: string | null
+          talent_login?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "design_gap_ignores_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_gap_ignores_talent_id_fkey"
+            columns: ["talent_id"]
+            isOneToOne: false
+            referencedRelation: "talents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_blocks: {
         Row: {
           content: Json
@@ -629,9 +737,11 @@ export type Database = {
           file_name: string | null
           icon: string | null
           id: string
+          kind: string | null
           mime_type: string | null
           organization_id: string
           parent_id: string | null
+          path: string
           size_bytes: number | null
           storage_bucket: string | null
           storage_path: string | null
@@ -649,9 +759,11 @@ export type Database = {
           file_name?: string | null
           icon?: string | null
           id?: string
+          kind?: string | null
           mime_type?: string | null
           organization_id: string
           parent_id?: string | null
+          path?: string
           size_bytes?: number | null
           storage_bucket?: string | null
           storage_path?: string | null
@@ -669,9 +781,11 @@ export type Database = {
           file_name?: string | null
           icon?: string | null
           id?: string
+          kind?: string | null
           mime_type?: string | null
           organization_id?: string
           parent_id?: string | null
+          path?: string
           size_bytes?: number | null
           storage_bucket?: string | null
           storage_path?: string | null
@@ -854,6 +968,10 @@ export type Database = {
           organization_id: string
           note_date: string
           body: string
+          owner_user_id: string
+          owner_login: string
+          assistant_user_id: string | null
+          assistant_login: string | null
           updated_by: string | null
           updated_by_login: string | null
           created_at: string
@@ -864,6 +982,10 @@ export type Database = {
           organization_id: string
           note_date: string
           body?: string
+          owner_user_id: string
+          owner_login: string
+          assistant_user_id?: string | null
+          assistant_login?: string | null
           updated_by?: string | null
           updated_by_login?: string | null
           created_at?: string
@@ -874,6 +996,10 @@ export type Database = {
           organization_id?: string
           note_date?: string
           body?: string
+          owner_user_id?: string
+          owner_login?: string
+          assistant_user_id?: string | null
+          assistant_login?: string | null
           updated_by?: string | null
           updated_by_login?: string | null
           created_at?: string
@@ -882,6 +1008,118 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "ops_day_notes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ops_event_fichas: {
+        Row: {
+          id: string
+          organization_id: string
+          nombre: string
+          objetivo: string
+          fecha: string | null
+          responsable: string
+          participantes: string
+          contenido_necesario: string
+          promocion: string
+          recursos: string
+          aprobacion_directiva: string
+          estado: string
+          created_by: string | null
+          created_by_login: string | null
+          updated_by: string | null
+          updated_by_login: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          nombre: string
+          objetivo?: string
+          fecha?: string | null
+          responsable?: string
+          participantes?: string
+          contenido_necesario?: string
+          promocion?: string
+          recursos?: string
+          aprobacion_directiva?: string
+          estado?: string
+          created_by?: string | null
+          created_by_login?: string | null
+          updated_by?: string | null
+          updated_by_login?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          nombre?: string
+          objetivo?: string
+          fecha?: string | null
+          responsable?: string
+          participantes?: string
+          contenido_necesario?: string
+          promocion?: string
+          recursos?: string
+          aprobacion_directiva?: string
+          estado?: string
+          created_by?: string | null
+          created_by_login?: string | null
+          updated_by?: string | null
+          updated_by_login?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ops_event_fichas_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ops_owner_assistant_links: {
+        Row: {
+          id: string
+          organization_id: string
+          owner_user_id: string
+          owner_login: string
+          assistant_user_id: string
+          assistant_login: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          owner_user_id: string
+          owner_login: string
+          assistant_user_id: string
+          assistant_login: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          owner_user_id?: string
+          owner_login?: string
+          assistant_user_id?: string
+          assistant_login?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ops_owner_assistant_links_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -1516,7 +1754,9 @@ export type Database = {
       }
       tasks: {
         Row: {
+          assigned_by: string | null
           board_id: string | null
+          category: string
           created_at: string
           created_by: string | null
           deleted_at: string | null
@@ -1537,7 +1777,9 @@ export type Database = {
           version: number
         }
         Insert: {
+          assigned_by?: string | null
           board_id?: string | null
+          category?: string
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
@@ -1558,7 +1800,9 @@ export type Database = {
           version?: number
         }
         Update: {
+          assigned_by?: string | null
           board_id?: string | null
+          category?: string
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
@@ -1579,6 +1823,13 @@ export type Database = {
           version?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "tasks_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tasks_board_id_fkey"
             columns: ["board_id"]

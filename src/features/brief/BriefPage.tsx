@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, FileCode, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Download, FileCode, Plus, RefreshCw, Trash2 } from '@/components/icons'
 import { listDbTalents, listSponsorshipDeals, type DbTalent, type SponsorshipDeal } from '@/services/agency'
 import {
   briefFromDeal,

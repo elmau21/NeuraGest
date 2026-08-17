@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { X } from 'lucide-react'
+import { X } from '@/components/icons'
 import { useToastStore } from '@/stores/toast-store'
 
 export function ToastHost() {

@@ -8,7 +8,7 @@ import {
   RefreshCw,
   Sparkles,
   Trash2,
-} from 'lucide-react'
+} from '@/components/icons'
 import { listDbTalents, listSponsorshipDeals, type DbTalent, type SponsorshipDeal } from '@/services/agency'
 import { listCalendarEventsOps } from '@/services/ops'
 import {

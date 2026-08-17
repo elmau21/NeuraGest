@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { LineChart as LineChartIcon, SlidersHorizontal } from 'lucide-react'
+import { LineChart as LineChartIcon, SlidersHorizontal } from '@/components/icons'
 import type { MetricSnapshot } from '@/services/metrics'
 import { computeMovingAverage, simulateMovingAverageProjection } from './twitch-intelligence-utils'
 

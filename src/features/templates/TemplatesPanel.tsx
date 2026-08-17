@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Layers, Loader2 } from 'lucide-react'
+import { Layers, Loader2 } from '@/components/icons'
 import { applyTemplate, TEMPLATES, type TemplateKind } from '@/services/templates'
 import { useAuthStore } from '@/stores/auth-store'
 import { canMutate } from '@/services/permissions'

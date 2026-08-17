@@ -16,7 +16,7 @@ import {
   TrendingDown,
   TrendingUp,
   Trophy,
-} from 'lucide-react'
+} from '@/components/icons'
 import {
   Area,
   AreaChart,

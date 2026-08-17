@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Scale, UserPlus, X } from 'lucide-react'
+import { Scale, UserPlus, X } from '@/components/icons'
 import {
   assignTalentManager,
   listDbTalents,

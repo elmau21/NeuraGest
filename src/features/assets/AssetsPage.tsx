@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ExternalLink, Link2, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
+import { ExternalLink, Link2, Plus, RefreshCw, Trash2, Upload } from '@/components/icons'
 import { listDbTalents, listSponsorshipDeals, type DbTalent, type SponsorshipDeal } from '@/services/agency'
 import {
   COMMON_ASSET_TAGS,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { LayoutGrid, Plus, Trash2 } from 'lucide-react'
+import { LayoutGrid, Plus, Trash2 } from '@/components/icons'
 import type { Talent } from '@/types'
 import { StreamTile } from './StreamTile'
 import { MAX_MOSAIC_STREAMS } from './twitch-embed'

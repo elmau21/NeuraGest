@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Activity, ExternalLink, Eye, FileDown, Share2, Users } from 'lucide-react'
+import { Activity, ExternalLink, Eye, FileDown, Share2, Users } from '@/components/icons'
 import { useAppStore } from '@/stores/app-store'
 import { isTauri } from '@/services/twitch'
 import { listSponsorshipDeals, listOnboardingItems, type SponsorshipDeal, type OnboardingItem } from '@/services/agency'

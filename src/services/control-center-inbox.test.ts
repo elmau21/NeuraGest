@@ -20,6 +20,7 @@ function task(partial: Partial<TaskRecord> & { id: string; title: string }): Tas
     priority: 'medium',
     assignee: 'Equipo',
     tags: [],
+    category: 'General',
     estimate: 1,
     position: 0,
     ...partial,

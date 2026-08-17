@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ExternalLink, Film, Lightbulb, RefreshCw } from 'lucide-react'
+import { ExternalLink, Film, Lightbulb, RefreshCw } from '@/components/icons'
 import { buildVodSuggestions, fetchWeeklyVods, type VodSuggestion, type WeeklyVod } from '@/services/vod-digest'
 import { isTauri } from '@/services/twitch'
 

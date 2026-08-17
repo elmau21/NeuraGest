@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
-import { FileText, Plus } from 'lucide-react'
+import { FileText, Plus } from '@/components/icons'
 import {
   blocksToHtml,
   createWikiDocument,

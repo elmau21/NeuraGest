@@ -21,7 +21,7 @@ import {
   Activity,
   HeartHandshake,
   LineChart,
-} from 'lucide-react'
+} from '@/components/icons'
 import {
   Area,
   AreaChart,

@@ -1,11 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Activity, Award, Beaker, BookOpen, Brain, CalendarCheck, CalendarDays, ChartColumn,
-  ChevronDown, ChevronLeft, ChevronRight, Columns3, Contact, FileText, Film, Forward, GitCompare, Handshake,
-  Image, LayoutDashboard, LayoutGrid, LayoutTemplate, ListChecks, ListTodo, Loader2, LogOut, Menu, Package, Paintbrush,
-  PanelRight, PanelsTopLeft, PenLine, Percent, PieChart, Scan, Search, Settings, Shield, Sparkles, UserSearch, Users, Wallet, X,
-} from 'lucide-react'
+  Activity, ChevronDown, ChevronLeft, ChevronRight, Loader2, LogOut, Menu, Search, UserRound, X,
+} from '@/components/icons'
 import { PageTransition } from '@/components/PageTransition'
 import { ToastHost } from '@/components/ToastHost'
 import { TalentsSkeleton } from '@/components/Skeleton'
@@ -20,7 +17,9 @@ import { SplashScreen } from '@/features/auth/SplashScreen'
 import { neuraliveLogotype } from '@/assets/brand'
 import { useAppStore } from '@/stores/app-store'
 import { OAuthWaitingPanel } from '@/features/auth/OAuthWaitingPanel'
+import { NoRoleWaitingPage } from '@/features/auth/NoRoleWaitingPage'
 import { PermissionsPanel } from '@/features/settings/PermissionsPanel'
+import { OwnerAssistantPanel } from '@/features/settings/OwnerAssistantPanel'
 import { SupabaseStatusCard } from '@/features/settings/SupabaseStatusCard'
 import { DiscordSettings } from '@/features/settings/DiscordSettings'
 import { DiscordPresenceSync } from '@/features/settings/DiscordPresenceSync'
@@ -34,6 +33,7 @@ import { UpdaterPanel } from '@/features/settings/UpdaterPanel'
 import { ManagerTour } from '@/features/onboarding/ManagerTour'
 import { NativeAlertSettings } from '@/features/settings/NativeAlertSettings'
 import { LiveSoundSettings } from '@/features/settings/LiveSoundSettings'
+import { NavVisibilitySettings } from '@/features/settings/NavVisibilitySettings'
 import { TemplatesPanel } from '@/features/templates/TemplatesPanel'
 import { TasksPage } from '@/features/tasks/TasksPage'
 import { CalendarPage } from '@/features/calendar/CalendarPage'
@@ -59,6 +59,8 @@ import { NeuraLeagueOperationsPage } from '@/features/neuraleague/NeuraLeagueOpe
 import { HandoffPage } from '@/features/handoff/HandoffPage'
 import { AuditPage } from '@/features/audit/AuditPage'
 import { ControlCenterPage } from '@/features/control-center/ControlCenterPage'
+import { AssistantTasksPage } from '@/features/control-center/AssistantTasksPage'
+import { EventFichasPage } from '@/features/control-center/EventFichasPage'
 import { ActivityInbox } from '@/features/activity/ActivityInbox'
 import { MediaKitPage } from '@/features/media-kit/MediaKitPage'
 import { WarRoomPage } from '@/features/war-room/WarRoomPage'
@@ -71,14 +73,24 @@ import { BoardPackPage } from '@/features/board-pack/BoardPackPage'
 import { useAuthStore } from '@/stores/auth-store'
 import {
   canAccessControlCenter,
+  canAccessDatosNav,
   canAccessPath,
   canAdminMutate,
   canManageAppRoles,
   canMutateCrm,
   defaultPathForRoles,
   isBasicSettingsOnly,
+  isNoRoleUser,
 } from '@/services/permissions'
+import { allNavItems, navSections, navTourIds, settingsNav, type NavItem } from '@/services/nav-config'
+import {
+  isNavItemHidden,
+  NAV_VISIBILITY_CHANGED,
+  readNavVisibilityPrefs,
+  type NavVisibilityPrefs,
+} from '@/services/nav-preferences'
 import { canViewAudit } from '@/services/audit'
+import type { AppRole } from '@/services/app-users'
 
 const MlPage = lazy(() => import('@/features/ml/MlPage'))
 const TalentProfilePage = lazy(() => import('@/features/talent-profile/TalentProfilePage'))
@@ -108,87 +120,24 @@ function writeSidebarSections(state: SidebarSectionState) {
   } catch { /* ignore */ }
 }
 
-type NavItem = readonly [string, string, typeof PanelsTopLeft]
-
-const navSections: ReadonlyArray<{ title: string; items: readonly NavItem[] }> = [
-  {
-    title: 'Ops',
-    items: [
-      ['/control', 'Centro de control', LayoutDashboard],
-      ['/', 'Dashboard', PanelsTopLeft],
-      ['/war-room', 'War Room', Scan],
-      ['/talentos', 'Talentos', Users],
-      ['/pipeline', 'Pipeline', Columns3],
-      ['/crm', 'CRM', Handshake],
-      ['/schedule', 'Schedule', CalendarCheck],
-      ['/comisiones', 'Comisiones', Wallet],
-      ['/portal', 'Portal', PanelRight],
-    ],
-  },
-  {
-    title: 'Contenido',
-    items: [
-      ['/rate-card', 'Rate Card', Percent],
-      ['/brief', 'Brief', PenLine],
-      ['/assets', 'Assets', Image],
-      ['/handoff', 'Handoff', Forward],
-      ['/media-kit', 'Media Kit', Contact],
-      ['/media-kit/comparar', 'Comparar kits', GitCompare],
-      ['/vod-digest', 'VOD digest', Film],
-      ['/board-pack', 'Board pack', Package],
-      ['/onboarding', 'Onboarding', Sparkles],
-      ['/tareas', 'Tareas', ListTodo],
-      ['/wiki', 'Wiki', BookOpen],
-      ['/documentos', 'Documentos', FileText],
-      ['/calendario', 'Calendario', CalendarDays],
-    ],
-  },
-  {
-    title: 'Diseño',
-    items: [
-      ['/diseno', 'Diseño gráfico', Paintbrush],
-      ['/diseno/huecos', 'Huecos de canal', LayoutTemplate],
-      ['/diseno/briefs', 'Briefs creativos', ListChecks],
-    ],
-  },
-  {
-    title: 'NeuraLeague',
-    items: [
-      ['/neuralleague', 'Temporada', LayoutGrid],
-      ['/neuralleague/equipos', 'Equipos', Award],
-      ['/neuralleague/jugadores', 'Jugadores', Users],
-      ['/neuralleague/calendario', 'Calendario', CalendarDays],
-      ['/neuralleague/stats', 'Stats', ChartColumn],
-      ['/neuralleague/vods', 'VODs', Film],
-      ['/neuralleague/entrenamientos', 'Entrenamientos', Activity],
-      ['/neuralleague/reclutamiento', 'Reclutamiento', UserSearch],
-      ['/neuralleague/operacion', 'Operación', ListChecks],
-    ],
-  },
-  {
-    title: 'Datos',
-    items: [
-      ['/inteligencia', 'Inteligencia', Brain],
-      ['/ciencia-datos', 'Ciencia de datos', Beaker],
-      ['/estadisticas', 'Estadísticas', ChartColumn],
-      ['/analitica', 'Analítica', PieChart],
-      ['/auditoria', 'Auditoría', Shield],
-    ],
-  },
-]
-
-const settingsNav: NavItem = ['/ajustes', 'Ajustes', Settings]
-
-const navTourIds: Record<string, string> = {
-  '/war-room': 'nav-war-room',
-  '/crm': 'nav-crm',
-  '/inteligencia': 'nav-inteligencia',
-  '/ciencia-datos': 'nav-ml',
-  '/ml': 'nav-ml',
-  '/ajustes': 'nav-ajustes',
+function filterNavItems(
+  sectionTitle: string,
+  items: readonly NavItem[],
+  roles: AppRole[],
+  login: string | undefined,
+  navPrefs: NavVisibilityPrefs,
+  showAudit: boolean,
+  showControlCenter: boolean,
+): NavItem[] {
+  if (sectionTitle === 'Datos' && !canAccessDatosNav(roles, login)) return []
+  return items.filter(([to]) => {
+    if (to === '/auditoria' && !showAudit) return false
+    if (to === '/control' && !showControlCenter) return false
+    if (!canAccessPath(roles, to, login)) return false
+    if (isNavItemHidden(navPrefs, to, sectionTitle)) return false
+    return true
+  })
 }
-
-const nav: NavItem[] = [...navSections.flatMap((section) => section.items), settingsNav]
 
 function readSidebarCollapsed() {
   try {
@@ -232,6 +181,20 @@ function Talents() {
         {hasCompletedSync && !loading && filtered.length === 0 && <p className="empty-state">No hay talentos que coincidan con la búsqueda.</p>}
       </div>
     </Card></>
+}
+
+const SESSION_ROLE_LABELS: Record<string, string> = {
+  owner: 'Owner',
+  admin: 'Admin',
+  manager: 'Manager',
+  staff: 'Staff',
+  assistant: 'Asistente',
+  dev: 'Dev',
+  designer: 'Diseñador',
+  league_manager: 'Manager Liga',
+  coach: 'Coach',
+  analyst: 'Analyst',
+  player: 'Jugador',
 }
 
 function SettingsPage() {
@@ -287,28 +250,62 @@ function SettingsPage() {
       </div>
     )}
     {!basicOnly && settingsTab === 'permisos' && manageRoles ? (
-      <Card className="permissions-card"><PermissionsPanel/></Card>
+      <PermissionsPanel />
     ) : !basicOnly && settingsTab === 'plantillas' ? (
       <TemplatesPanel/>
     ) : (
     <div className="settings-grid">
-    <Card><h3>Sesión Twitch</h3><p>Tu identidad en NeuraGest está vinculada a tu cuenta de Twitch.</p>
-      <div className="connection oauth-connection session-connection">
-        {session?.avatarUrl
-          ? <img src={session.avatarUrl} alt="" className="session-avatar" />
-          : <div className="avatar-placeholder">{session?.displayName.slice(0, 2).toUpperCase() ?? 'NL'}</div>}
-        <div><b>{session?.displayName ?? 'Sin sesión'}</b><span>{session ? `@${session.login}` : 'Inicia sesión con Twitch para continuar'}</span></div>
+    <Card className="settings-panel-card twitch-session-card">
+      <div className="settings-panel-head">
+        <div>
+          <h3><UserRound size={16} strokeWidth={1.6} /> Sesión Twitch</h3>
+          <p>Tu identidad en NeuraGest está vinculada a tu cuenta de Twitch.</p>
+        </div>
       </div>
+
+      <div className="session-profile-row">
+        <div className="session-avatar-wrap" aria-hidden>
+          {session?.avatarUrl
+            ? <img src={session.avatarUrl} alt="" className="session-avatar" />
+            : <div className="avatar-placeholder">{session?.displayName?.slice(0, 2).toUpperCase() ?? 'NL'}</div>}
+        </div>
+        <div className="session-profile-info">
+          <b>{session?.displayName ?? 'Sin sesión'}</b>
+          <span>{session ? `@${session.login}` : 'Inicia sesión con Twitch para continuar'}</span>
+        </div>
+      </div>
+
+      {roles.length > 0 && (
+        <div className="session-roles">
+          <span className="session-roles-label">Roles</span>
+          <div className="session-role-chips">
+            {roles.map((role) => (
+              <span key={role} className="session-role-chip">{SESSION_ROLE_LABELS[role] ?? role}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="settings-panel-divider" aria-hidden />
+
       <div className="settings-session-actions">
         <button className="twitch-button" disabled={isReconnecting} onClick={() => void startTwitchLogin()}>
           {isReconnecting ? 'Esperando autorización…' : session ? 'Reconectar cuenta' : 'Iniciar sesión'}
         </button>
-        {session && <button className="secondary" onClick={() => void logout()}><LogOut size={15}/>Cerrar sesión</button>}
+        {session && (
+          <button type="button" className="secondary ghost-btn" onClick={() => void logout()}>
+            <LogOut size={15} strokeWidth={1.6} /> Cerrar sesión
+          </button>
+        )}
       </div>
-      {authError && oauthFlow === 'idle' && <p className="integration-note">{authError}</p>}
-      {identityError && <p className="integration-note">Sincronización de cuenta: {identityError}</p>}
-      {roles.length > 0 && <p className="integration-note">Roles: {roles.join(', ')}</p>}
-      {crmReadonly && roles.includes('staff') && <p className="integration-note staff-readonly-banner">Staff: CRM, permisos y wiki crítica en solo lectura.</p>}
+
+      {authError && oauthFlow === 'idle' && <p className="integration-note settings-panel-note">{authError}</p>}
+      {identityError && <p className="integration-note settings-panel-note">Sincronización de cuenta: {identityError}</p>}
+      {crmReadonly && roles.includes('staff') && (
+        <p className="integration-note settings-panel-note staff-readonly-banner">
+          Staff: CRM, permisos y wiki crítica en solo lectura.
+        </p>
+      )}
       {oauthFlow !== 'idle' && (
         <OAuthWaitingPanel
           phase={oauthFlow}
@@ -318,14 +315,19 @@ function SettingsPage() {
         />
       )}
     </Card>
+    {(roles.includes('owner') || roles.includes('admin')) && (
+      <OwnerAssistantPanel />
+    )}
     {basicOnly ? (
       <>
+        <NavVisibilitySettings/>
         <NativeAlertSettings/>
         <LiveSoundSettings/>
         <DiscordSettings personalOnly/>
       </>
     ) : (
       <>
+        <NavVisibilitySettings/>
         <Card><h3>Monitoreo Twitch</h3><p>Métricas públicas de talentos en tiempo casi real.</p>
           <div className={`connection helix-connection ${helixStatus}`}><div className={helixStatus === 'connected' ? 'online-dot' : helixStatus === 'error' ? 'offline-dot' : 'pending-dot'}/><div><b>{helixLabel}</b><span>{helixStatus === 'connected' ? `Monitoreo activo${lastTwitchUpdate ? ` · actualizado ${new Date(lastTwitchUpdate).toLocaleTimeString()}` : ''}` : twitchError ?? 'Preparando consulta de métricas públicas'}</span></div><button className="secondary" onClick={() => void refreshTalentData().then(() => {
             const err = useAppStore.getState().twitchError
@@ -356,8 +358,23 @@ function CommandPalette() {
   const roles = useAuthStore((s) => s.roles)
   const session = useAuthStore((s) => s.session)
   const login = session?.login
+  const showAudit = canViewAudit(roles)
+  const showControlCenter = canAccessControlCenter(roles, login)
+  const [navPrefs, setNavPrefs] = useState(() => readNavVisibilityPrefs(login))
+  useEffect(() => {
+    setNavPrefs(readNavVisibilityPrefs(login))
+    const onChange = () => setNavPrefs(readNavVisibilityPrefs(login))
+    window.addEventListener(NAV_VISIBILITY_CHANGED, onChange)
+    return () => window.removeEventListener(NAV_VISIBILITY_CHANGED, onChange)
+  }, [login])
   if (!open) return null
-  const items = nav.filter(([to]) => to !== '/ajustes' && canAccessPath(roles, to, login))
+  const items = allNavItems.filter(([to]) => {
+    if (to === '/ajustes') return false
+    if (isNavItemHidden(navPrefs, to, navSections.find((s) => s.items.some(([p]) => p === to))?.title ?? '')) return false
+    if (to === '/auditoria' && !showAudit) return false
+    if (to === '/control' && !showControlCenter) return false
+    return canAccessPath(roles, to, login)
+  })
   return <div className="modal-backdrop" onClick={() => setOpen(false)}><div className="command-modal" onClick={(e) => e.stopPropagation()}><div><Search size={19}/><input autoFocus placeholder="Buscar talentos, tareas, documentos…"/><kbd>ESC</kbd></div>{items.map(([to,label,Icon]) => <button key={to} onClick={() => { navigate(to); setOpen(false) }}><Icon size={17} strokeWidth={1.75} absoluteStrokeWidth />{label}<span>Ir a</span></button>)}</div></div>
 }
 
@@ -383,27 +400,23 @@ function Shell() {
   const roles = useAuthStore((s) => s.roles)
   const logout = useAuthStore((s) => s.logout)
   const login = session?.login
+  const location = useLocation()
+  const noRole = isNoRoleUser(roles, login)
   const showAudit = canViewAudit(roles)
   const showControlCenter = canAccessControlCenter(roles, login)
-  const showSettingsNav = canAccessPath(roles, '/ajustes', login)
+  const showSettingsNav = canAccessPath(roles, '/ajustes', login) && !noRole
+  const [navPrefs, setNavPrefs] = useState(() => readNavVisibilityPrefs(login))
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const toggleCollapsed = () => {
-    setCollapsed((prev) => {
-      const next = !prev
-      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0') } catch { /* ignore */ }
-      return next
-    })
-  }
-  const location = useLocation()
-  const toggleSection = (title: string) => {
-    setSectionCollapsed((prev) => {
-      // Si estaba expandida (`false`), colapsar; si estaba colapsada (`true`/ausente), expandir.
-      const next = { ...prev, [title]: prev[title] === false }
-      writeSidebarSections(next)
-      return next
-    })
-  }
+
   useEffect(() => {
+    setNavPrefs(readNavVisibilityPrefs(login))
+    const onChange = () => setNavPrefs(readNavVisibilityPrefs(login))
+    window.addEventListener(NAV_VISIBILITY_CHANGED, onChange)
+    return () => window.removeEventListener(NAV_VISIBILITY_CHANGED, onChange)
+  }, [login])
+
+  useEffect(() => {
+    if (noRole) return
     const section = navSections.find((s) =>
       s.items.some(([to]) => (to === '/' ? location.pathname === '/' : location.pathname === to || location.pathname.startsWith(`${to}/`))),
     )
@@ -414,19 +427,58 @@ function Shell() {
       writeSidebarSections(next)
       return next
     })
-  }, [location.pathname])
-  useEffect(() => { const onKey = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setCommandOpen(true) } if (e.key === 'Escape') { setCommandOpen(false); setUserMenuOpen(false) } }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey) }, [setCommandOpen])
+  }, [location.pathname, noRole])
+
   useEffect(() => {
+    if (noRole) return
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setCommandOpen(true) }
+      if (e.key === 'Escape') { setCommandOpen(false); setUserMenuOpen(false) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [setCommandOpen, noRole])
+
+  useEffect(() => {
+    if (noRole) return
     if (!userMenuOpen) return
     const close = () => setUserMenuOpen(false)
     window.addEventListener('click', close)
     return () => window.removeEventListener('click', close)
-  }, [userMenuOpen])
+  }, [userMenuOpen, noRole])
+
   useEffect(() => {
+    if (noRole) return
     void refreshTalentData()
     const polling = window.setInterval(() => { void refreshTalentData() }, 60_000)
     return () => window.clearInterval(polling)
-  }, [refreshTalentData])
+  }, [refreshTalentData, noRole])
+
+  if (noRole) {
+    if (location.pathname !== '/') {
+      return <Navigate to="/" replace />
+    }
+    return (
+      <div className="app-shell no-role-shell">
+        <NoRoleWaitingPage />
+      </div>
+    )
+  }
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev
+      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0') } catch { /* ignore */ }
+      return next
+    })
+  }
+  const toggleSection = (title: string) => {
+    setSectionCollapsed((prev) => {
+      const next = { ...prev, [title]: prev[title] === false }
+      writeSidebarSections(next)
+      return next
+    })
+  }
   const sidebarLabel = demo ? 'Requiere app de escritorio' : helixStatus === 'connected' ? 'Twitch conectado' : helixStatus === 'error' ? 'Error de conexión Twitch' : 'Conectando con Twitch…'
   const sidebarDot = demo || helixStatus === 'error' ? 'offline-dot' : helixStatus === 'connected' ? 'online-dot' : 'pending-dot'
   const avatarLabel = session?.displayName.slice(0, 2).toUpperCase() ?? 'NL'
@@ -456,11 +508,15 @@ function Shell() {
     </button>
     <nav>
       {navSections.map((section) => {
-        const visibleItems = section.items.filter(([to]) => {
-          if (to === '/auditoria' && !showAudit) return false
-          if (to === '/control' && !showControlCenter) return false
-          return canAccessPath(roles, to, login)
-        })
+        const visibleItems = filterNavItems(
+          section.title,
+          section.items,
+          roles,
+          login,
+          navPrefs,
+          showAudit,
+          showControlCenter,
+        )
         if (visibleItems.length === 0) return null
         const isSectionCollapsed = isSidebarSectionCollapsed(sectionCollapsed, section.title)
         return (
@@ -489,7 +545,7 @@ function Shell() {
           </div>
         )
       })}
-      {showSettingsNav && (
+      {showSettingsNav && !isNavItemHidden(navPrefs, settingsNav[0], 'Ajustes') && (
         <div className="sidebar-section sidebar-section-settings">
           {renderNavLink(settingsNav)}
         </div>
@@ -500,7 +556,7 @@ function Shell() {
       <span>{sidebarLabel}<small>Monitoreo público + caché local</small></span>
     </div>
   </aside>
-    <main><header><button className="mobile-menu" onClick={() => setMobile(true)}><Menu/></button><button className="quick-search" onClick={() => setCommandOpen(true)}><Search size={16}/>Buscar en NeuraGest<kbd>Ctrl K</kbd></button><div className="header-actions"><ActiveUsersBadge/><ActivityInbox/><div className="user-menu-wrap"><button className="user-avatar" onClick={(e) => { e.stopPropagation(); setUserMenuOpen((open) => !open) }} aria-label="Menú de usuario">{session?.avatarUrl ? <img src={session.avatarUrl} alt="" /> : avatarLabel}</button>{userMenuOpen && <div className="user-menu" onClick={(e) => e.stopPropagation()}><div className="user-menu-head"><b>{session?.displayName ?? 'Usuario'}</b><span>@{session?.login ?? 'twitch'}</span></div><button onClick={() => { setUserMenuOpen(false); void logout() }}><LogOut size={15}/>Cerrar sesión</button></div>}</div></div></header><div className="content"><RoleRouteGuard/><PageTransition><Routes location={location}><Route path="/" element={<Dashboard/>}/><Route path="/control" element={showControlCenter ? <ControlCenterPage/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/asistente" element={<Navigate to="/control" replace />}/><Route path="/war-room" element={<WarRoomPage/>}/><Route path="/talentos" element={<Talents/>}/><Route path="/talento/:login" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando perfil…</div>}><TalentProfilePage/></Suspense>}/><Route path="/pipeline" element={<PipelinePage/>}/><Route path="/crm" element={<CrmPage/>}/><Route path="/rate-card" element={<RateCardPage/>}/><Route path="/brief" element={<BriefPage/>}/><Route path="/assets" element={<AssetsPage/>}/><Route path="/diseno" element={<CreativeDrivePage/>}/><Route path="/diseno/huecos" element={<ChannelGapsPage/>}/><Route path="/diseno/briefs" element={<CreativeBriefsPage/>}/><Route path="/neuralleague" element={<NeuraLeagueOverviewPage/>}/><Route path="/neuralleague/equipos" element={<NeuraLeagueTeamsPage/>}/><Route path="/neuralleague/jugadores" element={<NeuraLeaguePlayersPage/>}/><Route path="/neuralleague/calendario" element={<NeuraLeagueCalendarPage/>}/><Route path="/neuralleague/stats" element={<NeuraLeagueStatsPage/>}/><Route path="/neuralleague/vods" element={<NeuraLeagueVodsPage/>}/><Route path="/neuralleague/entrenamientos" element={<NeuraLeagueTrainingPage/>}/><Route path="/neuralleague/reclutamiento" element={<NeuraLeagueRecruitmentPage/>}/><Route path="/neuralleague/operacion" element={<NeuraLeagueOperationsPage/>}/><Route path="/handoff" element={<HandoffPage/>}/><Route path="/comisiones" element={<CommissionsPage/>}/><Route path="/portal" element={<PortalPage/>}/><Route path="/portal/:login" element={<PortalPage/>}/><Route path="/media-kit" element={<MediaKitPage/>}/><Route path="/media-kit/comparar" element={<MediaKitComparePage/>}/><Route path="/vod-digest" element={<VodDigestPage/>}/><Route path="/board-pack" element={<BoardPackPage/>}/><Route path="/schedule" element={<ScheduleCompliancePage/>}/><Route path="/onboarding" element={<OnboardingPage/>}/><Route path="/tareas" element={<TasksPage/>}/><Route path="/wiki" element={<WikiPage/>}/><Route path="/documentos" element={<Documents/>}/><Route path="/calendario" element={<CalendarPage/>}/><Route path="/inteligencia" element={<TwitchIntelligencePage/>}/><Route path="/ciencia-datos" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense>}/><Route path="/ml" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense>}/><Route path="/estadisticas" element={<PlatformStatsPage/>}/><Route path="/analitica" element={<Analytics/>}/><Route path="/auditoria" element={showAudit ? <AuditPage/> : <Dashboard/>}/><Route path="/ajustes" element={<SettingsPage/>}/></Routes></PageTransition></div></main><CommandPalette/><ManagerTour/></div>
+    <main><header><button className="mobile-menu" onClick={() => setMobile(true)}><Menu/></button><button className="quick-search" onClick={() => setCommandOpen(true)}><Search size={16}/>Buscar en NeuraGest<kbd>Ctrl K</kbd></button><div className="header-actions"><ActiveUsersBadge/><ActivityInbox/><div className="user-menu-wrap"><button className="user-avatar" onClick={(e) => { e.stopPropagation(); setUserMenuOpen((open) => !open) }} aria-label="Menú de usuario">{session?.avatarUrl ? <img src={session.avatarUrl} alt="" /> : avatarLabel}</button>{userMenuOpen && <div className="user-menu" onClick={(e) => e.stopPropagation()}><div className="user-menu-head"><b>{session?.displayName ?? 'Usuario'}</b><span>@{session?.login ?? 'twitch'}</span></div><button onClick={() => { setUserMenuOpen(false); void logout() }}><LogOut size={15}/>Cerrar sesión</button></div>}</div></div></header><div className="content"><RoleRouteGuard/><PageTransition><Routes location={location}><Route path="/" element={<Dashboard/>}/><Route path="/control" element={showControlCenter ? <ControlCenterPage/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/control/tareas" element={showControlCenter ? <AssistantTasksPage/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/control/fichas" element={showControlCenter ? <EventFichasPage/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/asistente" element={<Navigate to="/control" replace />}/><Route path="/war-room" element={<WarRoomPage/>}/><Route path="/talentos" element={<Talents/>}/><Route path="/talento/:login" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando perfil…</div>}><TalentProfilePage/></Suspense>}/><Route path="/pipeline" element={<PipelinePage/>}/><Route path="/crm" element={<CrmPage/>}/><Route path="/rate-card" element={<RateCardPage/>}/><Route path="/brief" element={<BriefPage/>}/><Route path="/assets" element={<AssetsPage/>}/><Route path="/diseno" element={<CreativeDrivePage/>}/><Route path="/diseno/huecos" element={<ChannelGapsPage/>}/><Route path="/diseno/briefs" element={<CreativeBriefsPage/>}/><Route path="/neuralleague" element={<NeuraLeagueOverviewPage/>}/><Route path="/neuralleague/equipos" element={<NeuraLeagueTeamsPage/>}/><Route path="/neuralleague/jugadores" element={<NeuraLeaguePlayersPage/>}/><Route path="/neuralleague/calendario" element={<NeuraLeagueCalendarPage/>}/><Route path="/neuralleague/stats" element={<NeuraLeagueStatsPage/>}/><Route path="/neuralleague/vods" element={<NeuraLeagueVodsPage/>}/><Route path="/neuralleague/entrenamientos" element={<NeuraLeagueTrainingPage/>}/><Route path="/neuralleague/reclutamiento" element={<NeuraLeagueRecruitmentPage/>}/><Route path="/neuralleague/operacion" element={<NeuraLeagueOperationsPage/>}/><Route path="/handoff" element={<HandoffPage/>}/><Route path="/comisiones" element={<CommissionsPage/>}/><Route path="/portal" element={<PortalPage/>}/><Route path="/portal/:login" element={<PortalPage/>}/><Route path="/media-kit" element={<MediaKitPage/>}/><Route path="/media-kit/comparar" element={<MediaKitComparePage/>}/><Route path="/vod-digest" element={<VodDigestPage/>}/><Route path="/board-pack" element={<BoardPackPage/>}/><Route path="/schedule" element={<ScheduleCompliancePage/>}/><Route path="/onboarding" element={<OnboardingPage/>}/><Route path="/tareas" element={<TasksPage/>}/><Route path="/wiki" element={<WikiPage/>}/><Route path="/documentos" element={<Documents/>}/><Route path="/calendario" element={<CalendarPage/>}/><Route path="/inteligencia" element={canAccessDatosNav(roles, login) ? <TwitchIntelligencePage/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/ciencia-datos" element={canAccessDatosNav(roles, login) ? <Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/ml" element={canAccessDatosNav(roles, login) ? <Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/estadisticas" element={canAccessDatosNav(roles, login) ? <PlatformStatsPage/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/analitica" element={canAccessDatosNav(roles, login) ? <Analytics/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/auditoria" element={showAudit && canAccessDatosNav(roles, login) ? <AuditPage/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/ajustes" element={<SettingsPage/>}/></Routes></PageTransition></div></main><CommandPalette/><ManagerTour/></div>
 }
 
 function AppGate() {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bell, X } from 'lucide-react'
+import { Bell, X } from '@/components/icons'
 import { fetchActivity, watchActivity, type ActivityItem } from '@/services/activity'
 
 function relativeTime(iso: string): string {

@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts'
-import { AlertCircle, Tag } from 'lucide-react'
+import { AlertCircle, Tag } from '@/components/icons'
 import type { CategoryRadarTalent } from './twitch-intelligence-utils'
 
 const tooltipStyle = {

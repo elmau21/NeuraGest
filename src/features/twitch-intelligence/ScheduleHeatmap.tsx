@@ -1,4 +1,4 @@
-import { Clock } from 'lucide-react'
+import { Clock } from '@/components/icons'
 import { buildScheduleHeatmap, dayLabel, type HeatmapCell } from './twitch-intelligence-utils'
 
 function cellColor(intensity: number) {

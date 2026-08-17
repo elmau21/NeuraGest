@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays } from '@/components/icons'
 import {
   getGoogleCalendarSettings,
   saveGoogleCalendarSettings,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MessageSquare, Paperclip, Trash2, X } from 'lucide-react'
+import { MessageSquare, Paperclip, Trash2, X } from '@/components/icons'
 import { useTasksStore } from '@/stores/tasks-store'
 import {
   addComment,

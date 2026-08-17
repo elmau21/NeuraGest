@@ -9,7 +9,7 @@ import {
   VolumeX,
   X,
   UserRound,
-} from 'lucide-react'
+} from '@/components/icons'
 import type { Talent } from '@/types'
 import {
   buildTwitchChannelUrl,

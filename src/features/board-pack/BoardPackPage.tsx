@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Archive, Download } from 'lucide-react'
+import { Archive, Download } from '@/components/icons'
 import { useAppStore } from '@/stores/app-store'
 import { downloadBoardPack } from '@/services/board-pack'
 import { isTauri } from '@/services/twitch'

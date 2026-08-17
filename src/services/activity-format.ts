@@ -134,6 +134,22 @@ export function formatActivityLabel(
       )
     case 'handoff.updated':
       return withActor(actorName, `actualizó un handoff${meta.status ? ` (${meta.status})` : ''}`)
+    case 'ops_owner_assistant.assigned':
+      return withActor(
+        actorName,
+        `vinculó al asistente @${meta.assistantLogin ?? '?'} con @${meta.ownerLogin ?? 'owner'}`,
+      )
+    case 'ops_owner_assistant.unassigned':
+      return withActor(
+        actorName,
+        `desvinculó al asistente @${meta.assistantLogin ?? '?'} de @${meta.ownerLogin ?? 'owner'}`,
+      )
+    case 'event_ficha.created':
+      return withActor(actorName, `registró la mini-ficha «${title || 'campaña/evento'}»`)
+    case 'event_ficha.updated':
+      return withActor(actorName, `actualizó la mini-ficha «${title || 'campaña/evento'}»`)
+    case 'event_ficha.deleted':
+      return withActor(actorName, `eliminó la mini-ficha «${title || 'campaña/evento'}»`)
     case 'session.login':
     case 'auth.login':
       return withActor(actorName, 'inició sesión en NeuraGest')

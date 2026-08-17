@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Download, History } from 'lucide-react'
+import { Download, History } from '@/components/icons'
 import { backfillMetricsClips } from '@/services/helix-profiles'
 import { useAuthStore } from '@/stores/auth-store'
 import { canMutate } from '@/services/permissions'

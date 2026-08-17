@@ -19,7 +19,7 @@ import {
   SlidersHorizontal,
   Trophy,
   Users,
-} from 'lucide-react'
+} from '@/components/icons'
 import {
   Bar,
   BarChart,

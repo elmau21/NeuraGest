@@ -75,6 +75,24 @@ export async function createCalendarEvent(input: {
   }
 }
 
+export type CalendarMutationResult = { ok: true } | { ok: false; error: string }
+
+export async function deleteCalendarEvent(id: string): Promise<CalendarMutationResult> {
+  if (!supabase) return { ok: false, error: 'La nube no está configurada' }
+  const deletedAt = new Date().toISOString()
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .update({ deleted_at: deletedAt })
+    .eq('id', id)
+    .is('deleted_at', null)
+    .select('id,title')
+    .maybeSingle()
+  if (error) return { ok: false, error: error.message }
+  if (!data) return { ok: false, error: 'No se pudo eliminar el evento (permisos o evento inexistente)' }
+  await logActivity('calendar', 'deleted', { title: data.title, deleted_at: deletedAt }, id)
+  return { ok: true }
+}
+
 function escapeIcs(text: string): string {
   return text.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n')
 }

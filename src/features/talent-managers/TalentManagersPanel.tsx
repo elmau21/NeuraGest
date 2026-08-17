@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { UserPlus, X } from 'lucide-react'
+import { UserPlus, X } from '@/components/icons'
 import { listAppUsers, type AppUserRecord } from '@/services/app-users'
 import {
   assignTalentManager,

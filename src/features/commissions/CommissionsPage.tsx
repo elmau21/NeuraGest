@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, RefreshCw, Trash2, TrendingUp, FileText, Receipt } from 'lucide-react'
+import { Plus, RefreshCw, Trash2, TrendingUp, FileText, Receipt } from '@/components/icons'
 import { isTauri } from '@/services/twitch'
 import {
   COMMISSION_STATUS_LABELS,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MessageCircle, Radio, Send } from 'lucide-react'
+import { Discord, Radio, Send } from '@/components/icons'
 import {
   getDiscordSettings,
   saveDiscordSettings,
@@ -128,7 +128,7 @@ export function DiscordSettings({ personalOnly = false }: DiscordSettingsProps) 
 
   return (
     <div className="card discord-settings-card">
-      <h3><MessageCircle size={16}/> Discord</h3>
+      <h3><Discord size={16}/> Discord</h3>
       <p>
         {personalOnly
           ? 'Estado en tu perfil de Discord mientras usas NeuraGest.'

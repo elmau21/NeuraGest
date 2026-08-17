@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Check, ExternalLink, Loader2, Radio, XCircle } from 'lucide-react'
+import { Check, ExternalLink, Loader2, Radio, XCircle } from '@/components/icons'
 import type { OAuthFlowPhase } from '@/stores/auth-store'
 
 type Props = {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Users } from 'lucide-react'
+import { Users } from '@/components/icons'
 import {
   subscribeOrgPresence,
   type OrgPresenceUser,

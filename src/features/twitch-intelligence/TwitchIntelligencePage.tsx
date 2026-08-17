@@ -12,7 +12,7 @@ import {
   Sparkles,
   Tag,
   Trophy,
-} from 'lucide-react'
+} from '@/components/icons'
 import { useAppStore } from '@/stores/app-store'
 import { useTalentDataSources } from '@/hooks/useTalentDataSources'
 import { TalentSourceCounters } from '@/components/TalentSourceCounters'

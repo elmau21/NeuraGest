@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Columns2, Download, RefreshCw } from 'lucide-react'
+import { Columns2, Download, RefreshCw } from '@/components/icons'
 import { useAppStore } from '@/stores/app-store'
 import { isTauri } from '@/services/twitch'
 import { computeMediaKitStats, generateMediaKitPdf, loadMediaKitData, type MediaKitStats } from '@/services/media-kit'

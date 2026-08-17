@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, Plus, RefreshCw } from 'lucide-react'
+import { Download, Plus, RefreshCw } from '@/components/icons'
 import {
   exportLeagueBoardPack,
   listCandidates,

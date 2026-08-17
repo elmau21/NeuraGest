@@ -35,6 +35,8 @@ pub struct EnsureAppUserResult {
 #[serde(rename_all = "camelCase")]
 pub struct AppUserRecord {
     pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth_user_id: Option<String>,
     pub twitch_login: String,
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
@@ -472,6 +474,7 @@ pub async fn list_app_users() -> Result<Vec<AppUserRecord>, String> {
         .map(|row| AppUserRecord {
             roles: roles_by_user.get(&row.id).cloned().unwrap_or_default(),
             id: row.id,
+            auth_user_id: row.auth_user_id,
             twitch_login: row.twitch_login,
             display_name: row.display_name,
             avatar_url: row.avatar_url,

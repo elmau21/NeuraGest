@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   canAccessControlCenter,
+  canAccessDatosNav,
   canAccessPath,
   canAdminMutate,
   canAssignDevRole,
   canAssignOwnerRole,
   canAssignStrongRoles,
+  canCreateDocumentDriveFolder,
   canEditPersonalSettings,
   canManageAppRoles,
   canMutate,
@@ -17,11 +19,13 @@ import {
   DESIGNER_DEFAULT_PATH,
   DEV_ALLOWED_PATHS,
   DEV_DEFAULT_PATH,
+  hasAppAccess,
   hasFullNavAccess,
   isBasicSettingsOnly,
   isDesignerOnlyNav,
   isDevOnlyNav,
   isLeagueOnlyNav,
+  isNoRoleUser,
   isRestrictedNav,
   LEAGUE_ALLOWED_PATHS,
   LEAGUE_DEFAULT_PATH,
@@ -162,6 +166,8 @@ describe('nav por rol', () => {
     expect(isRestrictedNav(['assistant'])).toBe(false)
     expect(canAccessPath(['assistant'], '/crm')).toBe(true)
     expect(canAccessPath(['assistant'], '/auditoria')).toBe(true)
+    expect(canAccessPath(['assistant'], '/inteligencia')).toBe(true)
+    expect(canAccessDatosNav(['assistant'])).toBe(true)
     expect(canAccessPath(['assistant'], '/diseno')).toBe(true)
     expect(canAccessPath(['assistant'], '/neuralleague')).toBe(true)
     expect(canAccessPath(['assistant'], CONTROL_CENTER_PATH)).toBe(true)
@@ -192,5 +198,45 @@ describe('nav por rol', () => {
     expect(canAccessControlCenter(['designer'])).toBe(false)
     expect(canAccessPath(['staff'], CONTROL_CENTER_PATH)).toBe(false)
     expect(canAccessPath(['designer'], CONTROL_CENTER_PATH)).toBe(false)
+  })
+
+  it('sin roles: solo pantalla de espera en /', () => {
+    expect(isNoRoleUser([])).toBe(true)
+    expect(hasAppAccess([])).toBe(false)
+    expect(canAccessPath([], '/')).toBe(true)
+    expect(canAccessPath([], '/crm')).toBe(false)
+    expect(canAccessPath([], '/ajustes')).toBe(false)
+    expect(canAccessPath([], '/inteligencia')).toBe(false)
+    expect(defaultPathForRoles([])).toBe('/')
+  })
+
+  it('Datos solo para owner, dev y assistant', () => {
+    expect(canAccessDatosNav(['owner'])).toBe(true)
+    expect(canAccessDatosNav(['dev'])).toBe(true)
+    expect(canAccessDatosNav(['assistant'])).toBe(true)
+    expect(canAccessDatosNav(['admin'])).toBe(false)
+    expect(canAccessDatosNav(['manager'])).toBe(false)
+    expect(canAccessDatosNav(['staff'])).toBe(false)
+    expect(canAccessDatosNav(['designer'])).toBe(false)
+    expect(canAccessDatosNav(['coach'])).toBe(false)
+    expect(canAccessPath(['admin'], '/inteligencia')).toBe(false)
+    expect(canAccessPath(['admin'], '/auditoria')).toBe(false)
+    expect(canAccessPath(['manager'], '/analitica')).toBe(false)
+    expect(canAccessPath(['staff'], '/estadisticas')).toBe(false)
+    expect(canAccessPath(['owner'], '/inteligencia')).toBe(true)
+    expect(canAccessPath(['admin'], '/crm')).toBe(true)
+  })
+
+  it('canCreateDocumentDriveFolder: owner, manager y assistant; no admin/dev/staff', () => {
+    expect(canCreateDocumentDriveFolder(['owner'])).toBe(true)
+    expect(canCreateDocumentDriveFolder(['manager'])).toBe(true)
+    expect(canCreateDocumentDriveFolder(['assistant'])).toBe(true)
+    expect(canCreateDocumentDriveFolder(['owner', 'assistant'])).toBe(true)
+    expect(canCreateDocumentDriveFolder(['admin'])).toBe(false)
+    expect(canCreateDocumentDriveFolder(['dev'])).toBe(false)
+    expect(canCreateDocumentDriveFolder(['staff'])).toBe(false)
+    expect(canCreateDocumentDriveFolder(['designer'])).toBe(false)
+    expect(canCreateDocumentDriveFolder(['league_manager'])).toBe(false)
+    expect(canCreateDocumentDriveFolder(['coach'])).toBe(false)
   })
 })

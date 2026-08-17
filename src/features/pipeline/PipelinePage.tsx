@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core'
-import { ExternalLink, LayoutGrid, List, Plus, RefreshCw } from 'lucide-react'
+import { ExternalLink, LayoutGrid, List, Plus, RefreshCw } from '@/components/icons'
 import {
   CONTENT_TYPE_LABELS,
   deletePipelineItem,

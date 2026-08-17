@@ -8,12 +8,16 @@ import {
   Brain,
   CalendarDays,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
+  CircleAlert,
   Database,
+  EyeOff,
   LayoutTemplate,
   ListChecks,
   ListTodo,
+  Megaphone,
   Paintbrush,
   Radio,
   Scan,
@@ -24,14 +28,15 @@ import {
   Users,
   Volume2,
   AlertTriangle,
-  MessageSquare,
+  Discord,
   UserCog,
-} from 'lucide-react'
+} from '@/components/icons'
 import { ActiveUsersPanel } from '@/features/presence/ActiveUsersPanel'
 import { PermissionsPanel } from '@/features/settings/PermissionsPanel'
+import { OwnerAssistantPanel } from '@/features/settings/OwnerAssistantPanel'
 import { fetchAuditActivity } from '@/services/audit'
 import type { ActivityItem } from '@/services/activity'
-import { canAssignStrongRoles, canManageAppRoles, STRONG_APP_ROLES } from '@/services/permissions'
+import { canAssignStrongRoles, canManageAppRoles, canMutateDesign, STRONG_APP_ROLES } from '@/services/permissions'
 import {
   listEvents,
   listTryouts,
@@ -40,6 +45,7 @@ import {
 } from '@/services/neuraleague'
 import type { NlEvent, NlTryout, NlVod } from '@/services/neuraleague/types'
 import {
+  listDbTalents,
   listTalentManagers,
   listSponsorshipDeals,
   type TalentManagerRecord,
@@ -49,6 +55,18 @@ import {
   buildChannelGaps,
   type TalentChannelGap,
 } from '@/services/channel-gaps'
+import {
+  listDesignGapIgnores,
+  listDesignGapResolutions,
+  ignoreLoginSet,
+  markDesignGapIgnored,
+  markDesignGapResolved,
+  resolutionLoginSet,
+  unmarkDesignGapIgnored,
+  unmarkDesignGapResolved,
+  type DesignGapIgnore,
+  type DesignGapResolution,
+} from '@/services/design-gap-resolutions'
 import {
   findTalentRootFolder,
   listAllDriveItems,
@@ -63,6 +81,7 @@ import {
   type ControlInboxItem,
   type OpsAlert,
 } from '@/services/control-center-inbox'
+import { AssistantTasksSummary } from '@/features/control-center/AssistantTasksSummary'
 import {
   claimOpsCoverage,
   clearOpsCoverage,
@@ -74,6 +93,11 @@ import {
   type OpsCoverage,
   type OpsDayNote,
 } from '@/services/ops-coverage'
+import {
+  fetchOwnerAssistantLinkForUser,
+  fetchOwnerAssistantLinks,
+  type OwnerAssistantLink,
+} from '@/services/ops-owner-assistant'
 import { postOpsDiscordAlert } from '@/services/discord'
 import { listAppUsers, setAppUserRoles, type AppRole, type AppUserRecord } from '@/services/app-users'
 import { isTauri } from '@/services/twitch'
@@ -185,6 +209,7 @@ export function ControlCenterPage() {
   const lastTwitchUpdate = useAppStore((s) => s.lastTwitchUpdate)
   const manageRoles = canManageAppRoles(roles, session?.login)
   const canStrong = canAssignStrongRoles(roles, session?.login)
+  const canDesign = canMutateDesign(roles, session?.login)
   const hideStrongRoles = canStrong ? [] : STRONG_APP_ROLES
 
   const [activity, setActivity] = useState<ActivityItem[]>([])
@@ -194,6 +219,10 @@ export function ControlCenterPage() {
   const [tryouts, setTryouts] = useState<NlTryout[]>([])
   const [managers, setManagers] = useState<TalentManagerRecord[]>([])
   const [gaps, setGaps] = useState<TalentChannelGap[]>([])
+  const [gapResolutions, setGapResolutions] = useState<DesignGapResolution[]>([])
+  const [gapIgnores, setGapIgnores] = useState<DesignGapIgnore[]>([])
+  const [showResolvedGaps, setShowResolvedGaps] = useState(false)
+  const [showIgnoredGaps, setShowIgnoredGaps] = useState(false)
   const [vods, setVods] = useState<NlVod[]>([])
   const [calendar, setCalendar] = useState<CalendarEventOps[]>([])
   const [contractEnds, setContractEnds] = useState<Array<{ id: string; title: string; endsOn: string; href?: string }>>([])
@@ -201,6 +230,9 @@ export function ControlCenterPage() {
   const [dayNote, setDayNote] = useState<OpsDayNote | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
   const [noteEditing, setNoteEditing] = useState(false)
+  const [ownerAssistantLink, setOwnerAssistantLink] = useState<OwnerAssistantLink | null>(null)
+  const [allOwnerLinks, setAllOwnerLinks] = useState<OwnerAssistantLink[]>([])
+  const [adminNoteOwnerId, setAdminNoteOwnerId] = useState('')
   const [appUsers, setAppUsers] = useState<AppUserRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [busyAction, setBusyAction] = useState<string | null>(null)
@@ -211,7 +243,28 @@ export function ControlCenterPage() {
 
   const today = opsTodayDate()
   const myLogin = session?.login?.toLowerCase() ?? ''
+  const authUserId = session?.authUserId ?? ''
+  const isOwner = roles.includes('owner')
+  const isAssistantOnly = roles.includes('assistant') && !isOwner
+  const isAdminOnly = roles.includes('admin') && !isOwner
   const onDuty = Boolean(coverage && coverage.login.toLowerCase() === myLogin)
+
+  const notePairLink = useMemo(() => {
+    if (ownerAssistantLink) return ownerAssistantLink
+    if (isAdminOnly && adminNoteOwnerId) {
+      return allOwnerLinks.find((l) => l.ownerUserId === adminNoteOwnerId) ?? null
+    }
+    return null
+  }, [ownerAssistantLink, isAdminOnly, adminNoteOwnerId, allOwnerLinks])
+
+  const canWriteDayNote = Boolean(
+    notePairLink
+    && (
+      (isOwner && notePairLink.ownerUserId === authUserId)
+      || notePairLink.assistantUserId === authUserId
+      || roles.includes('admin')
+    ),
+  )
 
   const liveTalents = useMemo(() => talents.filter((t) => t.isLive), [talents])
 
@@ -230,12 +283,16 @@ export function ControlCenterPage() {
         managerRows,
         vodRows,
         coverageRow,
-        noteRow,
         calRows,
         nlContracts,
         deals,
         driveItems,
         users,
+        gapResolutionRows,
+        gapIgnoreRows,
+        dbTalentRows,
+        pairLink,
+        pairLinks,
       ] = await Promise.all([
         soft(fetchAuditActivity('all', 12), [] as ActivityItem[]),
         soft(listEvents(), [] as NlEvent[]),
@@ -245,13 +302,30 @@ export function ControlCenterPage() {
         isTauri ? soft(listTalentManagers(), [] as TalentManagerRecord[]) : Promise.resolve([] as TalentManagerRecord[]),
         soft(listVods(), [] as NlVod[]),
         soft(fetchOpsCoverage(today), null),
-        soft(fetchOpsDayNote(today), null),
         isTauri ? soft(listCalendarEventsOps(), [] as CalendarEventOps[]) : Promise.resolve([] as CalendarEventOps[]),
         soft(listContracts(), []),
         isTauri ? soft(listSponsorshipDeals(), []) : Promise.resolve([]),
         isTauri ? soft(listAllDriveItems(), []) : Promise.resolve([]),
         isTauri ? soft(listAppUsers(), [] as AppUserRecord[]) : Promise.resolve([] as AppUserRecord[]),
+        isTauri ? soft(listDesignGapResolutions(), [] as DesignGapResolution[]) : Promise.resolve([] as DesignGapResolution[]),
+        isTauri ? soft(listDesignGapIgnores(), [] as DesignGapIgnore[]) : Promise.resolve([] as DesignGapIgnore[]),
+        isTauri ? soft(listDbTalents(), []) : Promise.resolve([]),
+        authUserId ? soft(fetchOwnerAssistantLinkForUser(authUserId), null) : Promise.resolve(null),
+        soft(fetchOwnerAssistantLinks(), [] as OwnerAssistantLink[]),
       ])
+
+      const resolvedNoteOwnerId = (() => {
+        if (pairLink) return pairLink.ownerUserId
+        if (roles.includes('admin') && pairLinks.length > 0) {
+          const preferred = adminNoteOwnerId || pairLinks[0]?.ownerUserId
+          return preferred ?? ''
+        }
+        return ''
+      })()
+
+      const noteRowResolved = resolvedNoteOwnerId
+        ? await soft(fetchOpsDayNote(resolvedNoteOwnerId, today), null)
+        : null
 
       setActivity(audit)
       setEvents(nlEvents)
@@ -261,10 +335,15 @@ export function ControlCenterPage() {
       setManagers(managerRows)
       setVods(vodRows)
       setCoverage(coverageRow)
-      setDayNote(noteRow)
-      if (!noteEditingRef.current) setNoteDraft(noteRow?.body ?? '')
+      setOwnerAssistantLink(pairLink)
+      setAllOwnerLinks(pairLinks)
+      setAdminNoteOwnerId((prev) => prev || pairLinks[0]?.ownerUserId || '')
+      setDayNote(noteRowResolved)
+      if (!noteEditingRef.current) setNoteDraft(noteRowResolved?.body ?? '')
       setCalendar(calRows)
       setAppUsers(users)
+      setGapResolutions(gapResolutionRows)
+      setGapIgnores(gapIgnoreRows)
 
       const ends: Array<{ id: string; title: string; endsOn: string; href?: string }> = []
       for (const c of nlContracts) {
@@ -284,16 +363,23 @@ export function ControlCenterPage() {
       }
       setContractEnds(ends)
 
-      if (driveItems.length > 0 || roster.length > 0) {
+      if (driveItems.length > 0 || roster.length > 0 || dbTalentRows.length > 0) {
+        const byLogin = new Map(roster.map((t) => [t.login.toLowerCase(), t]))
+        const source = dbTalentRows.length > 0 ? dbTalentRows : roster
         setGaps(
           buildChannelGaps({
-            talents: roster.map((t) => ({
-              id: t.id,
-              login: t.login,
-              displayName: t.displayName,
-              avatar: t.avatar,
-              offlineImageUrl: t.offlineImageUrl,
-            })),
+            talents: source.map((t) => {
+              const live = byLogin.get(t.login.toLowerCase())
+              const avatarFromDb = 'avatarUrl' in t ? t.avatarUrl : undefined
+              const avatarFromTwitch = 'avatar' in t ? t.avatar : undefined
+              return {
+                id: t.id,
+                login: t.login,
+                displayName: t.displayName,
+                avatar: live?.avatar ?? avatarFromDb ?? avatarFromTwitch,
+                offlineImageUrl: live?.offlineImageUrl,
+              }
+            }),
             driveItems,
             findFolder: (login, name) => findTalentRootFolder(driveItems, login, name),
           }),
@@ -304,7 +390,7 @@ export function ControlCenterPage() {
     } finally {
       setLoading(false)
     }
-  }, [today])
+  }, [today, authUserId, roles])
 
   useEffect(() => {
     noteEditingRef.current = noteEditing
@@ -313,6 +399,18 @@ export function ControlCenterPage() {
   useEffect(() => {
     void loadAll()
   }, [loadAll])
+
+  useEffect(() => {
+    if (!isAdminOnly || !adminNoteOwnerId) return
+    void (async () => {
+      const note = await fetchOpsDayNote(adminNoteOwnerId, today)
+      setDayNote(note)
+      if (!noteEditingRef.current) setNoteDraft(note?.body ?? '')
+    })()
+  }, [adminNoteOwnerId, isAdminOnly, today])
+
+  const resolvedGapLogins = useMemo(() => resolutionLoginSet(gapResolutions), [gapResolutions])
+  const ignoredGapLogins = useMemo(() => ignoreLoginSet(gapIgnores), [gapIgnores])
 
   const inbox = useMemo(
     () =>
@@ -324,8 +422,30 @@ export function ControlCenterPage() {
         tryouts,
         gaps,
         events,
+        resolvedGapLogins,
+        ignoredGapLogins,
       }),
-    [tasks, talents, managers, briefs, tryouts, gaps, events],
+    [tasks, talents, managers, briefs, tryouts, gaps, events, resolvedGapLogins, ignoredGapLogins],
+  )
+
+  const visibleInbox = useMemo(
+    () =>
+      inbox.filter((item) => {
+        if (item.resolved && !showResolvedGaps) return false
+        if (item.ignored && !showIgnoredGaps) return false
+        return true
+      }),
+    [inbox, showResolvedGaps, showIgnoredGaps],
+  )
+
+  const resolvedGapCount = useMemo(
+    () => inbox.filter((item) => item.type === 'design_gap' && item.resolved).length,
+    [inbox],
+  )
+
+  const ignoredGapCount = useMemo(
+    () => inbox.filter((item) => item.type === 'design_gap' && item.ignored).length,
+    [inbox],
   )
 
   const scheduledStreams = useMemo(() => {
@@ -430,9 +550,20 @@ export function ControlCenterPage() {
   }
 
   const saveNote = async () => {
+    if (!notePairLink) {
+      toastInfo('Asigna un asistente antes de guardar notas.')
+      return
+    }
     setBusyAction('note')
     try {
-      const row = await saveOpsDayNote({ body: noteDraft, login: session?.login })
+      const row = await saveOpsDayNote({
+        body: noteDraft,
+        login: session?.login,
+        ownerUserId: notePairLink.ownerUserId,
+        ownerLogin: notePairLink.ownerLogin,
+        assistantUserId: notePairLink.assistantUserId,
+        assistantLogin: notePairLink.assistantLogin,
+      })
       if (!row) {
         toastError('No se pudo guardar la nota del día.')
         return
@@ -444,6 +575,10 @@ export function ControlCenterPage() {
       setBusyAction(null)
     }
   }
+
+  const reloadNotesAfterLink = useCallback(() => {
+    void loadAll()
+  }, [loadAll])
 
   const runDiscord = async (item: ControlInboxItem) => {
     setBusyAction(`discord:${item.id}`)
@@ -471,6 +606,90 @@ export function ControlCenterPage() {
       }
       setTasks((prev) => prev.map((t) => (t.id === item.taskId ? { ...t, status: 'done' } : t)))
       toastSuccess('Tarea marcada como hecha.')
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const toggleGapResolved = async (item: ControlInboxItem, resolve: boolean) => {
+    if (!item.talentLogin) return
+    if (!isTauri) {
+      toastInfo('Marcar huecos requiere la app de escritorio.')
+      return
+    }
+    const actionKey = resolve ? `resolve:${item.id}` : `unresolve:${item.id}`
+    setBusyAction(actionKey)
+    try {
+      const gap = gaps.find((g) => g.login.toLowerCase() === item.talentLogin!.toLowerCase())
+      if (resolve) {
+        const row = await markDesignGapResolved({
+          talentLogin: item.talentLogin,
+          talentId: gap?.talentId,
+          displayName: gap?.displayName ?? item.talentLogin,
+        })
+        setGapResolutions((prev) => {
+          const login = item.talentLogin!.toLowerCase()
+          const rest = prev.filter((r) => r.talentLogin.toLowerCase() !== login)
+          return [row, ...rest]
+        })
+        setGapIgnores((prev) =>
+          prev.filter((r) => r.talentLogin.toLowerCase() !== item.talentLogin!.toLowerCase()),
+        )
+        toastSuccess(`Huecos de @${item.talentLogin} marcados como resueltos.`)
+      } else {
+        await unmarkDesignGapResolved(
+          item.talentLogin,
+          gap?.displayName ?? item.talentLogin,
+        )
+        setGapResolutions((prev) =>
+          prev.filter((r) => r.talentLogin.toLowerCase() !== item.talentLogin!.toLowerCase()),
+        )
+        toastSuccess(`Huecos de @${item.talentLogin} vuelven a la cola activa.`)
+      }
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'No se pudo actualizar el estado.')
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const toggleGapIgnored = async (item: ControlInboxItem, ignore: boolean) => {
+    if (!item.talentLogin) return
+    if (!isTauri) {
+      toastInfo('Ignorar huecos requiere la app de escritorio.')
+      return
+    }
+    const actionKey = ignore ? `ignore:${item.id}` : `unignore:${item.id}`
+    setBusyAction(actionKey)
+    try {
+      const gap = gaps.find((g) => g.login.toLowerCase() === item.talentLogin!.toLowerCase())
+      if (ignore) {
+        const row = await markDesignGapIgnored({
+          talentLogin: item.talentLogin,
+          talentId: gap?.talentId,
+          displayName: gap?.displayName ?? item.talentLogin,
+        })
+        setGapIgnores((prev) => {
+          const login = item.talentLogin!.toLowerCase()
+          const rest = prev.filter((r) => r.talentLogin.toLowerCase() !== login)
+          return [row, ...rest]
+        })
+        setGapResolutions((prev) =>
+          prev.filter((r) => r.talentLogin.toLowerCase() !== item.talentLogin!.toLowerCase()),
+        )
+        toastSuccess(`Huecos de @${item.talentLogin} movidos a ignorados (pendientes).`)
+      } else {
+        await unmarkDesignGapIgnored(
+          item.talentLogin,
+          gap?.displayName ?? item.talentLogin,
+        )
+        setGapIgnores((prev) =>
+          prev.filter((r) => r.talentLogin.toLowerCase() !== item.talentLogin!.toLowerCase()),
+        )
+        toastSuccess(`Huecos de @${item.talentLogin} vuelven a la cola activa.`)
+      }
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'No se pudo actualizar el estado.')
     } finally {
       setBusyAction(null)
     }
@@ -537,29 +756,66 @@ export function ControlCenterPage() {
         </div>
       </div>
 
+      <AssistantTasksSummary tasks={tasks} />
+
       <SectionCard
         className="cc-inbox-hero"
         title="Qué hacer hoy"
         description="Cola unificada del día: tareas, lives, diseño y NeuraLeague."
         icon={ListTodo}
         action={
-          <button type="button" className="cc-inline-btn" onClick={() => void loadAll()} disabled={loading}>
-            Actualizar
-          </button>
+          <div className="cc-inbox-toolbar">
+            {resolvedGapCount > 0 ? (
+              <button
+                type="button"
+                className={`cc-filter-chip${showResolvedGaps ? ' active' : ''}`}
+                onClick={() => setShowResolvedGaps((v) => !v)}
+              >
+                <CheckCircle2 size={13} />
+                Resueltos ({resolvedGapCount})
+              </button>
+            ) : null}
+            {ignoredGapCount > 0 ? (
+              <button
+                type="button"
+                className={`cc-filter-chip ignored${showIgnoredGaps ? ' active' : ''}`}
+                onClick={() => setShowIgnoredGaps((v) => !v)}
+              >
+                <EyeOff size={13} />
+                Ignorados ({ignoredGapCount})
+              </button>
+            ) : null}
+            <button type="button" className="cc-inline-btn" onClick={() => void loadAll()} disabled={loading}>
+              Actualizar
+            </button>
+          </div>
         }
       >
         {loading ? (
           <p className="empty-state cc-empty">Cargando bandeja…</p>
-        ) : inbox.length === 0 ? (
+        ) : visibleInbox.length === 0 ? (
           <p className="empty-state cc-empty">Nada urgente por ahora. Buen día.</p>
         ) : (
           <ul className="cc-inbox">
-            {inbox.map((item) => (
-              <li key={item.id} className={`cc-inbox-item prio-${item.priority}`}>
+            {visibleInbox.map((item) => (
+              <li
+                key={item.id}
+                className={`cc-inbox-item prio-${item.priority}${item.resolved ? ' is-resolved' : ''}${item.ignored ? ' is-ignored' : ''}`}
+              >
                 <div className="cc-inbox-main">
                   <div className="cc-inbox-meta">
                     <span className="cc-pill type">{INBOX_TYPE_LABELS[item.type]}</span>
                     <span className={`cc-pill prio prio-${item.priority}`}>{INBOX_PRIORITY_LABELS[item.priority]}</span>
+                    {item.resolved ? (
+                      <span className="cc-pill resolved">
+                        <CheckCircle2 size={11} /> Resuelto
+                      </span>
+                    ) : null}
+                    {item.ignored ? (
+                      <span className="cc-pill ignored">
+                        <EyeOff size={11} /> Ignorado
+                      </span>
+                    ) : null}
                   </div>
                   <b>{item.title}</b>
                   <em>{item.detail}</em>
@@ -573,6 +829,44 @@ export function ControlCenterPage() {
                       title="Marcar hecha"
                     >
                       <Check size={13} /> Hecha
+                    </button>
+                  ) : null}
+                  {item.actions.includes('mark_resolved') && canDesign ? (
+                    <button
+                      type="button"
+                      disabled={busyAction === `resolve:${item.id}`}
+                      onClick={() => void toggleGapResolved(item, true)}
+                      title="Ocultar de la cola hasta que vuelva a faltar algo"
+                    >
+                      <CheckCircle2 size={13} /> Marcar resuelto
+                    </button>
+                  ) : null}
+                  {item.actions.includes('unmark_resolved') && canDesign ? (
+                    <button
+                      type="button"
+                      disabled={busyAction === `unresolve:${item.id}`}
+                      onClick={() => void toggleGapResolved(item, false)}
+                    >
+                      <CircleAlert size={13} /> Quitar resuelto
+                    </button>
+                  ) : null}
+                  {item.actions.includes('mark_ignored') && canDesign ? (
+                    <button
+                      type="button"
+                      disabled={busyAction === `ignore:${item.id}`}
+                      onClick={() => void toggleGapIgnored(item, true)}
+                      title="Ocultar de la cola activa; sigue pendiente en Drive"
+                    >
+                      <EyeOff size={13} /> Ignorar
+                    </button>
+                  ) : null}
+                  {item.actions.includes('unmark_ignored') && canDesign ? (
+                    <button
+                      type="button"
+                      disabled={busyAction === `unignore:${item.id}`}
+                      onClick={() => void toggleGapIgnored(item, false)}
+                    >
+                      <EyeOff size={13} /> Quitar de ignorados
                     </button>
                   ) : null}
                   {item.actions.includes('quick_brief') ? (
@@ -590,7 +884,7 @@ export function ControlCenterPage() {
                       disabled={busyAction === `discord:${item.id}`}
                       onClick={() => void runDiscord(item)}
                     >
-                      <MessageSquare size={13} /> Discord
+                      <Discord size={13} /> Discord
                     </button>
                   ) : null}
                   {manageRoles ? (
@@ -708,15 +1002,52 @@ export function ControlCenterPage() {
           description="Pizarra compartida owner ↔ asistente."
           icon={StickyNote}
           action={
-            !noteEditing ? (
+            canWriteDayNote && !noteEditing ? (
               <button type="button" className="cc-inline-btn" onClick={() => setNoteEditing(true)}>
                 {dayNote?.body ? 'Editar' : 'Escribir'}
               </button>
             ) : null
           }
         >
-          {noteEditing ? (
+          {isAdminOnly && allOwnerLinks.length > 1 ? (
+            <label className="cc-day-note-owner-pick">
+              Notas de
+              <select
+                value={adminNoteOwnerId}
+                onChange={(e) => setAdminNoteOwnerId(e.target.value)}
+              >
+                {allOwnerLinks.map((l) => (
+                  <option key={l.id} value={l.ownerUserId}>
+                    @{l.ownerLogin} ↔ @{l.assistantLogin}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          {!notePairLink && isOwner ? (
+            <div className="cc-day-note-empty">
+              <p className="empty-state cc-empty">
+                Asigna un asistente para empezar la pizarra del día.
+              </p>
+              <OwnerAssistantPanel compact onLinkChange={reloadNotesAfterLink} />
+              <p className="integration-note">
+                También puedes configurarlo en <Link to="/ajustes">Ajustes</Link>.
+              </p>
+            </div>
+          ) : !notePairLink && isAssistantOnly ? (
+            <p className="empty-state cc-empty">
+              Tu owner aún no te ha asignado. Pide que configure el vínculo en Ajustes.
+            </p>
+          ) : !notePairLink ? (
+            <p className="empty-state cc-empty">
+              Sin vínculo owner ↔ asistente. Configúralo en Ajustes.
+            </p>
+          ) : noteEditing ? (
             <div className="cc-day-note-edit">
+              <p className="integration-note cc-day-note-pair">
+                @{notePairLink.ownerLogin} → @{notePairLink.assistantLogin}
+              </p>
               <textarea
                 value={noteDraft}
                 onChange={(e) => setNoteDraft(e.target.value)}
@@ -741,6 +1072,9 @@ export function ControlCenterPage() {
             </div>
           ) : dayNote?.body ? (
             <div className="cc-day-note">
+              <p className="integration-note cc-day-note-pair">
+                @{notePairLink.ownerLogin} → @{notePairLink.assistantLogin}
+              </p>
               <p>{dayNote.body}</p>
               <small>
                 {dayNote.updatedByLogin ? `@${dayNote.updatedByLogin} · ` : ''}
@@ -748,7 +1082,12 @@ export function ControlCenterPage() {
               </small>
             </div>
           ) : (
-            <p className="empty-state cc-empty">Sin notas para hoy. Escribe lo que el turno necesita saber.</p>
+            <div className="cc-day-note-empty">
+              <p className="empty-state cc-empty">Sin notas para hoy. Escribe lo que el turno necesita saber.</p>
+              {isOwner && !ownerAssistantLink ? (
+                <OwnerAssistantPanel compact onLinkChange={reloadNotesAfterLink} />
+              ) : null}
+            </div>
           )}
         </SectionCard>
 
@@ -856,11 +1195,20 @@ export function ControlCenterPage() {
           )}
         </SectionCard>
 
+        <CollapsibleShortcuts title="Contenido, eventos y comunicación" description="Mini-fichas operativas de campañas y eventos." icon={Megaphone}>
+          <div className="cc-shortcuts">
+            <Shortcut to="/control/fichas" label="Mini-fichas operativas" icon={Megaphone} />
+            <Shortcut to="/calendario" label="Calendario" icon={CalendarDays} />
+            <Shortcut to="/diseno/briefs" label="Briefs de campaña" icon={ListChecks} />
+          </div>
+        </CollapsibleShortcuts>
+
         <CollapsibleShortcuts title="Atajos · Ops" description="War Room, tareas, calendario." icon={Scan}>
           <div className="cc-shortcuts">
             <Shortcut to="/war-room" label="War Room" icon={Scan} />
             <Shortcut to="/talentos" label="Talentos" icon={Users} />
-            <Shortcut to="/tareas" label="Tareas" icon={ListTodo} />
+            <Shortcut to="/control/tareas" label="Panel de tareas" icon={ListTodo} />
+            <Shortcut to="/control/fichas" label="Mini-fichas" icon={Megaphone} />
             <Shortcut to="/calendario" label="Calendario" icon={CalendarDays} />
           </div>
         </CollapsibleShortcuts>
@@ -895,7 +1243,7 @@ export function ControlCenterPage() {
             <Shortcut to="/analitica" label="Analítica" icon={Activity} />
             <Shortcut to="/inteligencia" label="Inteligencia" icon={Brain} />
             <Shortcut to="/ajustes" label="Alertas Windows" icon={Bell} />
-            <Shortcut to="/ajustes" label="Discord" icon={Radio} />
+            <Shortcut to="/ajustes" label="Discord" icon={Discord} />
             <Shortcut to="/ajustes" label="Sonido de live" icon={Volume2} />
             <Shortcut to="/ajustes" label="Ajustes" icon={Settings} />
           </div>
