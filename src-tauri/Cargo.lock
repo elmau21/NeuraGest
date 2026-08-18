@@ -2428,7 +2428,7 @@ dependencies = [
 
 [[package]]
 name = "neuragest"
-version = "1.0.4"
+version = "1.0.6"
 dependencies = [
  "chrono",
  "discord-rich-presence",

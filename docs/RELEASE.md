@@ -1,112 +1,148 @@
-# Release y firma — NeuraGest
+# Release y auto-updater — NeuraGest
 
-Guía para builds de producción, auto-updater y firma de código en Windows.
+Guía para builds de producción, publicación en GitHub Releases y actualizaciones automáticas con Tauri v2.
+
+## ¿Se puede?
+
+**Sí.** NeuraGest ya usa Tauri v2 con `tauri-plugin-updater`. Cuando publiques un release en GitHub, la app instalada comprueba `latest.json`, descarga el `.exe` firmado e instala con un clic — sin repartir zip/rar manualmente.
+
+## Cómo funciona
+
+```text
+Owner: git tag v1.0.7 && git push origin v1.0.7
+   ↓
+GitHub Actions (release.yml): build Windows + firma + latest.json
+   ↓
+GitHub Release: NeuraGest_1.0.7_x64-setup.exe + latest.json
+   ↓
+App del equipo: comprueba endpoint → "Hay una actualización disponible" → Actualizar ahora
+```
+
+El updater **verifica la firma criptográfica** de cada instalador antes de aplicarlo. Sin clave privada válida no se publica un update confiable.
 
 ## Prerrequisitos
 
 - Node.js 22+, Rust estable (MSVC), WiX Toolset (Tauri lo gestiona)
-- Variables en `.env` (nunca commitear `.env`):
+- Repo: `elmau21/NeuraGest` (privado)
+- Variables en `.env` local (nunca commitear):
 
 ```env
 TWITCH_CLIENT_ID=...
 TWITCH_CLIENT_SECRET=...
-SUPABASE_URL=...
-SUPABASE_SERVICE_ROLE_KEY=...
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
 TAURI_SIGNING_PRIVATE_KEY=
 TAURI_SIGNING_PRIVATE_KEY_PASSWORD=
+# Repo privado: token de solo lectura para descargar releases (ver abajo)
+VITE_GITHUB_RELEASES_TOKEN=
 ```
 
-## Build local
+## 1. Generar claves de firma (una sola vez)
 
 ```powershell
-npm run test
-npm run lint
+npm run tauri signer generate -w "$env:USERPROFILE\.tauri\neuragest.key"
+```
+
+- **Clave pública** → pégala en `src-tauri/tauri.conf.json` → `plugins.updater.pubkey` (es seguro commitearla).
+- **Clave privada** → guárdala en `$env:USERPROFILE\.tauri\neuragest.key` y como secret de GitHub `TAURI_SIGNING_PRIVATE_KEY` (contenido del archivo o ruta). **Nunca** en el repo.
+
+Opcional: secret `TAURI_SIGNING_PUBLIC_KEY` para que CI inyecte la pubkey si aún no la commiteaste.
+
+## 2. Configuración ya integrada
+
+| Archivo | Qué hace |
+|---------|----------|
+| `src-tauri/tauri.conf.json` | `createUpdaterArtifacts: true`, endpoint GitHub, `installMode: passive` |
+| `src-tauri/src/lib.rs` | Plugin updater registrado |
+| `src/services/updater.ts` | Comprobar / instalar + token GitHub opcional |
+| `src/features/settings/UpdaterPanel.tsx` | UI en Ajustes (español) |
+| `src/features/settings/BackgroundUpdater.tsx` | Aviso al iniciar si hay update |
+| `.github/workflows/release.yml` | Build + release automático al pushear tag `v*` |
+
+Endpoint configurado:
+
+```text
+https://github.com/elmau21/NeuraGest/releases/latest/download/latest.json
+```
+
+## 3. Repo privado y token
+
+Los assets de un repo **privado** requieren autenticación. Opciones:
+
+1. **Recomendado para el equipo:** crear un [PAT fine-grained](https://github.com/settings/tokens?type=beta) con permiso **Contents: Read-only** en `NeuraGest`. Añadirlo al build como `VITE_GITHUB_RELEASES_TOKEN` (secret `GITHUB_RELEASES_TOKEN` en CI). Se embebe en el `.exe` del equipo — aceptable para uso interno; rota el token si alguien deja la agencia.
+
+2. **Alternativa:** repo público solo de releases (`neuragest-releases`) con los `.exe` y `latest.json`, sin token.
+
+3. **Alternativa:** bucket público (Supabase Storage, S3) con `latest.json` + instalador.
+
+Sin token y con repo privado, la app mostrará error al buscar updates.
+
+## 4. Publicar una versión (owner)
+
+### Opción A — GitHub Actions (recomendado)
+
+1. Sube versión en `package.json`, `src-tauri/tauri.conf.json` y `src-tauri/Cargo.toml` (o deja que CI lo haga desde el tag).
+2. Commitea la **clave pública** en `tauri.conf.json` si aún dice `REPLACE_WITH_...`.
+3. Configura secrets en GitHub → Settings → Secrets:
+   - `TAURI_SIGNING_PRIVATE_KEY`
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (vacío si no tiene password)
+   - `TAURI_SIGNING_PUBLIC_KEY` (opcional)
+   - `GITHUB_RELEASES_TOKEN` (PAT read-only para builds del equipo)
+   - `TWITCH_*`, `VITE_SUPABASE_*` según el build
+4. Crea y pushea el tag:
+
+```powershell
+git tag v1.0.7
+git push origin v1.0.7
+```
+
+5. Actions genera el `.exe`, `.msi`, firmas `.sig` y `latest.json`, y crea el GitHub Release.
+
+### Opción B — Manual local
+
+```powershell
+$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$env:USERPROFILE\.tauri\neuragest.key" -Raw
+npm run build:release
+./scripts/prepare-updater-manifest.ps1 -Version "1.0.7" -Notes "Correcciones y mejoras"
+gh release create v1.0.7 `
+  src-tauri/target/release/bundle/nsis/NeuraGest_1.0.7_x64-setup.exe `
+  src-tauri/target/release/bundle/nsis/NeuraGest_1.0.7_x64-setup.exe.sig `
+  latest.json `
+  --title "NeuraGest v1.0.7" --notes "Release notes aquí"
+```
+
+## 5. Experiencia del equipo
+
+- Al abrir NeuraGest: tras ~8 s, toast **«Hay una actualización disponible…»** si hay versión nueva.
+- **Ajustes → Actualizaciones:** «Buscar actualizaciones» / **«Actualizar ahora (vX.Y.Z)»**.
+- Windows instala en modo pasivo (barra de progreso, sin wizard). Reinicia la app al terminar.
+
+## Build local (sin publicar)
+
+```powershell
 npm run build:release
 ```
 
-Scripts disponibles:
-
-| Script | Descripción |
-|--------|-------------|
-| `npm run build:release` | test + build frontend + Tauri NSIS/MSI |
-| `npm run tauri:build` | Solo bundle Tauri (asume `dist/` listo) |
-| `npm run build:windows` | Alias de release completo |
-
 Artefactos:
 
-- `src-tauri/target/release/bundle/nsis/NeuraGest_1.0.0_x64-setup.exe`
-- `src-tauri/target/release/bundle/msi/NeuraGest_1.0.0_x64_en-US.msi`
+- `src-tauri/target/release/bundle/nsis/NeuraGest_<versión>_x64-setup.exe`
+- `src-tauri/target/release/bundle/msi/NeuraGest_<versión>_x64_en-US.msi`
+- `.exe.sig` / `.msi.sig` si `TAURI_SIGNING_PRIVATE_KEY` está definida
 
-## Auto-updater (Tauri v2)
+## CI
 
-El plugin `@tauri-apps/plugin-updater` ya está integrado. **No hay certificado incluido en el repo.**
-
-### 1. Generar par de claves de firma
-
-```powershell
-npm run tauri signer generate -w ~/.tauri/neuragest.key
-```
-
-Copia la **clave pública** generada a `plugins.updater.pubkey` en `src-tauri/tauri.conf.json`.
-Guarda la clave privada fuera del repo (CI secret `TAURI_SIGNING_PRIVATE_KEY`).
-
-### 2. Configurar endpoints
-
-En `src-tauri/tauri.conf.json`:
-
-```json
-"plugins": {
-  "updater": {
-    "pubkey": "<TU_CLAVE_PUBLICA>",
-    "endpoints": [
-      "https://releases.neuralive.example/latest.json"
-    ],
-    "windows": { "installMode": "passive" }
-  }
-}
-```
-
-### 3. Publicar `latest.json`
-
-Ejemplo mínimo (adaptar URLs y checksums reales):
-
-```json
-{
-  "version": "1.0.1",
-  "notes": "Correcciones y mejoras.",
-  "pub_date": "2026-08-07T12:00:00Z",
-  "platforms": {
-    "windows-x86_64": {
-      "signature": "<firma del .msi o .nsis.zip>",
-      "url": "https://releases.neuralive.example/NeuraGest_1.0.1_x64-setup.exe"
-    }
-  }
-}
-```
-
-Genera la firma con:
-
-```powershell
-npm run tauri signer sign --file path/to/installer.exe
-```
-
-### 4. Sin certificado (estado actual)
-
-Hasta que configures pubkey + endpoints + hosting:
-
-- La UI en **Ajustes → Actualizaciones** mostrará que el updater no está configurado.
-- Los builds locales funcionan sin firma de updater.
-- Para **code signing Windows** (SmartScreen), necesitas un certificado EV/OV de una CA; no se incluye en este repositorio.
-
-## CI (GitHub Actions)
-
-Ver `.github/workflows/ci.yml`: lint, test y build frontend en cada push/PR.
-El build Tauri completo puede añadirse en un workflow separado con runner `windows-latest` y secrets de firma.
+- `.github/workflows/ci.yml` — lint, test, build frontend en cada push/PR.
+- `.github/workflows/release.yml` — build Windows + GitHub Release en tags `v*`.
 
 ## Checklist pre-release
 
-- [ ] `npm run test` verde
-- [ ] `npm run lint` sin errores
-- [ ] Versión bump en `package.json` y `tauri.conf.json`
-- [ ] `latest.json` publicado y firmado
-- [ ] Probar «Buscar actualizaciones» en Ajustes
+- [ ] `npm run test` y `npm run lint` verdes
+- [ ] Versión coherente en `package.json`, `tauri.conf.json`, `Cargo.toml`
+- [ ] `plugins.updater.pubkey` con clave real (no el placeholder)
+- [ ] Secrets de firma y (si aplica) `GITHUB_RELEASES_TOKEN` en GitHub
+- [ ] Tag `vX.Y.Z` pusheado
+- [ ] Probar «Buscar actualizaciones» en Ajustes con una versión anterior instalada
+
+## Code signing Windows (SmartScreen)
+
+La firma del **updater** (Tauri) es distinta del **code signing** EV/OV de Microsoft. Para reducir avisos de SmartScreen necesitas certificado de CA comercial; no está incluido en este repo.

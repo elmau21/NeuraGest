@@ -90,7 +90,7 @@ Artefactos esperados:
 - `src-tauri/target/release/bundle/nsis/NeuraGest_1.0.0_x64-setup.exe`
 - `src-tauri/target/release/bundle/msi/NeuraGest_1.0.0_x64_en-US.msi`
 
-Para publicar auto-updates configura una clave Tauri, agrega `plugins.updater.endpoints` y `plugins.updater.pubkey` a `tauri.conf.json`, firma los artefactos y publica `latest.json`. El plugin está integrado, pero no se incluye una clave ficticia.
+Para publicar auto-updates con GitHub Releases, sigue [docs/RELEASE.md](docs/RELEASE.md): genera claves Tauri, configura `plugins.updater.pubkey`, secrets de CI y publica con `git tag vX.Y.Z && git push origin vX.Y.Z`. El plugin ya está integrado; el equipo verá «Hay una actualización disponible» en Ajustes.
 
 ## Arquitectura
 
