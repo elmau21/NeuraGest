@@ -9,14 +9,22 @@ import {
 import { logActivity } from '@/services/activity-log'
 import type { Priority, TaskStatus } from '@/types'
 
+export type TaskAssignee = {
+  userId: string
+  label: string
+}
+
 export type TaskRecord = {
   id: string
   title: string
   description: string
   status: TaskStatus
   priority: Priority
+  /** Etiqueta legible (varios unidos con « · »). */
   assignee: string
+  /** Primer responsable (compat). Preferir `assignees`. */
   assigneeId?: string
+  assignees: TaskAssignee[]
   assignedBy?: string
   assignedById?: string
   dueDate?: string
@@ -27,6 +35,11 @@ export type TaskRecord = {
   startsAt?: string
   createdAt?: string
   updatedAt?: string
+}
+
+function formatAssigneesLabel(assignees: TaskAssignee[]): string {
+  if (assignees.length === 0) return 'Sin asignar'
+  return assignees.map((a) => a.label).join(' · ')
 }
 
 export type SubtaskRecord = {
@@ -80,13 +93,13 @@ async function loadUserLabels(userIds: string[]): Promise<Map<string, string>> {
 
 function mapTask(
   row: Record<string, unknown>,
-  assigneeByTask: Map<string, { userId: string; label: string }>,
+  assigneeByTask: Map<string, TaskAssignee[]>,
   userLabels: Map<string, string>,
 ): TaskRecord {
   const statusId = String(row.status_id ?? '')
   const priorityId = String(row.priority_id ?? '')
   const id = String(row.id)
-  const assignment = assigneeByTask.get(id)
+  const assignees = assigneeByTask.get(id) ?? []
   const assignedById = row.assigned_by ? String(row.assigned_by) : undefined
   return {
     id,
@@ -94,8 +107,9 @@ function mapTask(
     description: String(row.description ?? ''),
     status: (STATUS_BY_ID[statusId] ?? 'backlog') as TaskStatus,
     priority: (PRIORITY_BY_ID[priorityId] ?? 'medium') as Priority,
-    assignee: assignment?.label ?? 'Sin asignar',
-    assigneeId: assignment?.userId,
+    assignee: formatAssigneesLabel(assignees),
+    assigneeId: assignees[0]?.userId,
+    assignees,
     assignedBy: assignedById ? userLabels.get(assignedById) ?? 'Equipo' : undefined,
     assignedById,
     dueDate: row.due_at ? String(row.due_at).slice(0, 10) : undefined,
@@ -109,19 +123,23 @@ function mapTask(
   }
 }
 
-async function loadAssigneeMap(taskIds: string[]): Promise<Map<string, { userId: string; label: string }>> {
-  const map = new Map<string, { userId: string; label: string }>()
+async function loadAssigneeMap(taskIds: string[]): Promise<Map<string, TaskAssignee[]>> {
+  const map = new Map<string, TaskAssignee[]>()
   if (!supabase || taskIds.length === 0) return map
   const { data } = await supabase
     .from('task_assignments')
     .select('task_id,user_id,users(display_name)')
     .in('task_id', taskIds)
+    .order('assigned_at', { ascending: true })
   for (const row of data ?? []) {
     const users = row.users as UserLabelRow
-    map.set(row.task_id, {
+    const entry: TaskAssignee = {
       userId: row.user_id,
       label: userLabel(users),
-    })
+    }
+    const list = map.get(row.task_id) ?? []
+    list.push(entry)
+    map.set(row.task_id, list)
   }
   return map
 }
@@ -172,8 +190,16 @@ export async function createTask(input: Partial<TaskRecord>): Promise<TaskRecord
     `)
     .single()
   if (error || !data) return null
-  if (input.assigneeId) {
-    await supabase.from('task_assignments').insert({ task_id: data.id, user_id: input.assigneeId })
+  const assigneeIds = [
+    ...new Set([
+      ...(input.assignees?.map((a) => a.userId) ?? []),
+      ...(input.assigneeId ? [input.assigneeId] : []),
+    ]),
+  ].filter(Boolean)
+  if (assigneeIds.length > 0) {
+    await supabase.from('task_assignments').insert(
+      assigneeIds.map((userId) => ({ task_id: data.id, user_id: userId })),
+    )
   }
   const assigneeByTask = await loadAssigneeMap([data.id])
   const userLabels = await loadUserLabels(data.assigned_by ? [data.assigned_by] : [])
@@ -341,16 +367,38 @@ export async function fetchAttachments(taskId: string): Promise<AttachmentRecord
   }))
 }
 
-export async function assignTask(taskId: string, userId: string | null, assigneeLabel?: string): Promise<boolean> {
+/** Reemplaza los responsables de la tarea (cero o varios). */
+export async function setTaskAssignees(
+  taskId: string,
+  assignees: TaskAssignee[],
+): Promise<boolean> {
   if (!supabase) return false
+  const unique = new Map<string, TaskAssignee>()
+  for (const a of assignees) {
+    if (a.userId) unique.set(a.userId, a)
+  }
+  const list = [...unique.values()]
   const { error: clearError } = await supabase.from('task_assignments').delete().eq('task_id', taskId)
   if (clearError) return false
-  if (userId) {
-    const { error: insertError } = await supabase.from('task_assignments').insert({ task_id: taskId, user_id: userId })
+  if (list.length > 0) {
+    const { error: insertError } = await supabase.from('task_assignments').insert(
+      list.map((a) => ({ task_id: taskId, user_id: a.userId })),
+    )
     if (insertError) return false
   }
-  await logActivity('task', 'reassigned', { taskId, assignee: assigneeLabel ?? userId }, taskId)
+  await logActivity(
+    'task',
+    'reassigned',
+    { taskId, assignees: list.map((a) => a.label), count: list.length },
+    taskId,
+  )
   return true
+}
+
+/** Compat: un solo responsable (o ninguno). Preferir `setTaskAssignees`. */
+export async function assignTask(taskId: string, userId: string | null, assigneeLabel?: string): Promise<boolean> {
+  if (!userId) return setTaskAssignees(taskId, [])
+  return setTaskAssignees(taskId, [{ userId, label: assigneeLabel ?? 'Responsable' }])
 }
 
 export type TaskActivityRecord = {

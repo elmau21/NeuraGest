@@ -52,5 +52,15 @@ $manifest = [ordered]@{
 }
 
 $outPath = Join-Path $repoRoot 'latest.json'
-$manifest | ConvertTo-Json -Depth 6 | Set-Content -Path $outPath -Encoding utf8
-Write-Host "Generado $outPath para $downloadUrl"
+$json = ($manifest | ConvertTo-Json -Depth 6).Trim() + "`n"
+# UTF-8 sin BOM: Set-Content -Encoding utf8 escribe EF BB BF en Windows y
+# serde_json del plugin updater falla con "error decoding response body".
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText($outPath, $json, $utf8NoBom)
+
+$written = [System.IO.File]::ReadAllBytes($outPath)
+if ($written.Length -ge 3 -and $written[0] -eq 0xEF -and $written[1] -eq 0xBB -and $written[2] -eq 0xBF) {
+  throw "latest.json se escribio con BOM UTF-8; el updater de Tauri no puede parsearlo."
+}
+$null = $json | ConvertFrom-Json
+Write-Host "Generado $outPath para $downloadUrl (UTF-8 sin BOM)"

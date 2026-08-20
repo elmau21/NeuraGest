@@ -1,5 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type SyntheticEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  closestCorners,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core'
 import {
   ArrowLeft,
   CalendarDays,
@@ -13,10 +25,10 @@ import {
 import { TaskDetailPanel } from '@/features/tasks/TaskDetailPanel'
 import {
   addComment,
-  assignTask,
   createTask,
   fetchTasks,
   moveTaskStatus,
+  setTaskAssignees,
   type TaskRecord,
 } from '@/services/tasks'
 import {
@@ -87,10 +99,90 @@ function SummaryCard({ label, value, tone }: { label: string; value: number; ton
   )
 }
 
+function AssigneeChips({ task }: { task: TaskRecord }) {
+  const list = task.assignees?.length
+    ? task.assignees
+    : task.assigneeId
+      ? [{ userId: task.assigneeId, label: task.assignee }]
+      : []
+  if (list.length === 0) {
+    return (
+      <span className="at-assignee-chips empty">
+        <UserRound size={12} /> Sin asignar
+      </span>
+    )
+  }
+  return (
+    <span className="at-assignee-chips" title={task.assignee}>
+      <UserRound size={12} />
+      {list.slice(0, 3).map((a) => (
+        <em key={a.userId} className="at-chip">{a.label.split(' · ')[0]}</em>
+      ))}
+      {list.length > 3 ? <em className="at-chip more">+{list.length - 3}</em> : null}
+    </span>
+  )
+}
+
+function MultiAssigneePicker({
+  users,
+  selectedIds,
+  onChange,
+  label = 'Responsables',
+}: {
+  users: AssigneeOption[]
+  selectedIds: string[]
+  onChange: (ids: string[]) => void
+  label?: string
+}) {
+  const toggle = (userId: string) => {
+    onChange(
+      selectedIds.includes(userId)
+        ? selectedIds.filter((id) => id !== userId)
+        : [...selectedIds, userId],
+    )
+  }
+
+  return (
+    <div className="at-multi-assign">
+      <span className="at-multi-assign-label">{label}</span>
+      {users.length === 0 ? (
+        <p className="at-multi-assign-empty">No hay usuarios para asignar.</p>
+      ) : (
+        <div className="at-multi-assign-list">
+          {users.map((u) => {
+            const checked = selectedIds.includes(u.userId)
+            return (
+              <label key={u.userId} className={`at-multi-assign-option ${checked ? 'on' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggle(u.userId)}
+                />
+                <span>{u.label}</span>
+              </label>
+            )
+          })}
+        </div>
+      )}
+      <small>
+        {selectedIds.length === 0
+          ? 'Ninguno seleccionado'
+          : `${selectedIds.length} seleccionado${selectedIds.length === 1 ? '' : 's'}`}
+      </small>
+    </div>
+  )
+}
+
 function TaskQuickCard({
   task,
   readonly,
   users,
+  overlay = false,
+  dragRef,
+  dragStyle,
+  dragProps,
+  isDragging = false,
+  isDraggable = false,
   onOpen,
   onDone,
   onAssign,
@@ -99,17 +191,38 @@ function TaskQuickCard({
   task: TaskRecord
   readonly: boolean
   users: AssigneeOption[]
+  overlay?: boolean
+  dragRef?: (node: HTMLElement | null) => void
+  dragStyle?: CSSProperties
+  dragProps?: Record<string, unknown>
+  isDragging?: boolean
+  isDraggable?: boolean
   onOpen: () => void
   onDone: () => void
-  onAssign: (userId: string) => void
+  onAssign: (userIds: string[]) => void
   onComment: (body: string) => void
 }) {
   const [commentOpen, setCommentOpen] = useState(false)
   const [commentDraft, setCommentDraft] = useState('')
+  const [assignOpen, setAssignOpen] = useState(false)
   const overdue = formatDueLabel(task.dueDate).startsWith('Atrasada')
+  const selectedIds = (task.assignees?.length
+    ? task.assignees.map((a) => a.userId)
+    : task.assigneeId
+      ? [task.assigneeId]
+      : [])
+
+  const stopDrag = (event: SyntheticEvent) => {
+    event.stopPropagation()
+  }
 
   return (
-    <article className={`at-task-card ${overdue ? 'overdue' : ''}`}>
+    <article
+      ref={dragRef}
+      style={dragStyle}
+      className={`at-task-card ${overdue ? 'overdue' : ''} ${isDragging ? 'is-dragging' : ''} ${overlay ? 'at-task-card-overlay' : ''} ${isDraggable ? 'is-draggable' : ''}`.trim()}
+      {...(dragProps ?? {})}
+    >
       <button type="button" className="at-task-main" onClick={onOpen}>
         <div className="at-task-badges">
           <span className={`at-priority prio-${task.priority}`}>
@@ -120,13 +233,13 @@ function TaskQuickCard({
         <h4>{task.title}</h4>
         {task.description ? <p>{task.description}</p> : null}
         <div className="at-task-meta">
-          <span><UserRound size={12} /> {task.assignee}</span>
+          <AssigneeChips task={task} />
           <span>{formatDueLabel(task.dueDate)}</span>
           <span>{task.category}</span>
         </div>
       </button>
-      {!readonly ? (
-        <div className="at-task-actions">
+      {!readonly && !overlay ? (
+        <div className="at-task-actions" onPointerDown={stopDrag}>
           {task.status !== 'done' ? (
             <button type="button" className="at-action-btn" onClick={onDone} title="Marcar hecha">
               <Check size={13} /> Hecha
@@ -135,24 +248,26 @@ function TaskQuickCard({
           <button type="button" className="at-action-btn" onClick={() => setCommentOpen((v) => !v)}>
             <MessageSquare size={13} /> Comentar
           </button>
-          <label className="at-assign">
-            <span>Responsable</span>
-            <select
-              value={task.assigneeId ?? ''}
-              onChange={(e) => onAssign(e.target.value)}
-            >
-              <option value="">Sin asignar</option>
-              {users.map((u) => (
-                <option key={u.userId} value={u.userId}>
-                  {u.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <button
+            type="button"
+            className={`at-action-btn ${assignOpen ? 'active' : ''}`}
+            onClick={() => setAssignOpen((v) => !v)}
+          >
+            <UserRound size={13} /> Responsables
+          </button>
         </div>
       ) : null}
-      {commentOpen && !readonly ? (
-        <div className="at-inline-comment">
+      {assignOpen && !readonly && !overlay ? (
+        <div className="at-inline-assign" onPointerDown={stopDrag}>
+          <MultiAssigneePicker
+            users={users}
+            selectedIds={selectedIds}
+            onChange={(ids) => onAssign(ids)}
+          />
+        </div>
+      ) : null}
+      {commentOpen && !readonly && !overlay ? (
+        <div className="at-inline-comment" onPointerDown={stopDrag}>
           <input
             value={commentDraft}
             onChange={(e) => setCommentDraft(e.target.value)}
@@ -176,6 +291,177 @@ function TaskQuickCard({
   )
 }
 
+function DraggableTaskCard({
+  task,
+  readonly,
+  users,
+  onOpen,
+  onDone,
+  onAssign,
+  onComment,
+}: {
+  task: TaskRecord
+  readonly: boolean
+  users: AssigneeOption[]
+  onOpen: () => void
+  onDone: () => void
+  onAssign: (userIds: string[]) => void
+  onComment: (body: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: task.id,
+    disabled: readonly,
+  })
+  const style = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
+    : undefined
+
+  return (
+    <TaskQuickCard
+      task={task}
+      readonly={readonly}
+      users={users}
+      dragRef={setNodeRef}
+      dragStyle={style}
+      dragProps={readonly ? undefined : { ...attributes, ...listeners }}
+      isDragging={isDragging}
+      isDraggable={!readonly}
+      onOpen={onOpen}
+      onDone={onDone}
+      onAssign={onAssign}
+      onComment={onComment}
+    />
+  )
+}
+
+function KanbanColumn({
+  id,
+  title,
+  tasks,
+  readonly,
+  users,
+  onOpen,
+  onDone,
+  onAssign,
+  onComment,
+}: {
+  id: TaskStatus
+  title: string
+  tasks: TaskRecord[]
+  readonly: boolean
+  users: AssigneeOption[]
+  onOpen: (id: string) => void
+  onDone: (id: string) => void
+  onAssign: (taskId: string, userIds: string[]) => void
+  onComment: (taskId: string, body: string) => void
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id })
+  return (
+    <section className="at-kanban-col" data-column={id}>
+      <header><span>{title}</span><b>{tasks.length}</b></header>
+      <div ref={setNodeRef} className={`at-kanban-body ${isOver ? 'is-over' : ''}`}>
+        {tasks.map((task) => (
+          <DraggableTaskCard
+            key={task.id}
+            task={task}
+            readonly={readonly}
+            users={users}
+            onOpen={() => onOpen(task.id)}
+            onDone={() => onDone(task.id)}
+            onAssign={(userIds) => onAssign(task.id, userIds)}
+            onComment={(body) => onComment(task.id, body)}
+          />
+        ))}
+        {tasks.length === 0 ? (
+          <p className="at-empty-col">Nada aquí por ahora.</p>
+        ) : null}
+      </div>
+    </section>
+  )
+}
+
+function AssistantKanban({
+  tasks,
+  readonly,
+  users,
+  onOpen,
+  onDone,
+  onAssign,
+  onComment,
+  onMove,
+}: {
+  tasks: TaskRecord[]
+  readonly: boolean
+  users: AssigneeOption[]
+  onOpen: (id: string) => void
+  onDone: (id: string) => void
+  onAssign: (taskId: string, userIds: string[]) => void
+  onComment: (taskId: string, body: string) => void
+  onMove: (taskId: string, status: TaskStatus) => void
+}) {
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+
+  const onDragStart = ({ active }: DragStartEvent) => setActiveId(String(active.id))
+
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    setActiveId(null)
+    if (readonly || !over) return
+    const overId = String(over.id)
+    const nextStatus =
+      STATUS_COLUMNS.find((col) => col.id === overId)?.id
+      ?? tasks.find((task) => task.id === overId)?.status
+    if (!nextStatus) return
+    const taskId = String(active.id)
+    const current = tasks.find((task) => task.id === taskId)
+    if (!current || current.status === nextStatus) return
+    onMove(taskId, nextStatus)
+  }
+
+  const activeTask = tasks.find((task) => task.id === activeId)
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragCancel={() => setActiveId(null)}
+    >
+      <div className="at-kanban">
+        {STATUS_COLUMNS.map((col) => (
+          <KanbanColumn
+            key={col.id}
+            id={col.id}
+            title={col.title}
+            tasks={tasks.filter((t) => t.status === col.id)}
+            readonly={readonly}
+            users={users}
+            onOpen={onOpen}
+            onDone={onDone}
+            onAssign={onAssign}
+            onComment={onComment}
+          />
+        ))}
+      </div>
+      <DragOverlay>
+        {activeTask ? (
+          <TaskQuickCard
+            task={activeTask}
+            readonly
+            users={users}
+            overlay
+            onOpen={() => undefined}
+            onDone={() => undefined}
+            onAssign={() => undefined}
+            onComment={() => undefined}
+          />
+        ) : null}
+      </DragOverlay>
+    </DndContext>
+  )
+}
+
 function CreateTaskModal({
   open,
   users,
@@ -192,7 +478,7 @@ function CreateTaskModal({
   const [priority, setPriority] = useState<Priority>('medium')
   const [dueDate, setDueDate] = useState('')
   const [category, setCategory] = useState<string>('General')
-  const [assigneeId, setAssigneeId] = useState('')
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
   if (!open) return null
@@ -204,13 +490,17 @@ function CreateTaskModal({
     }
     setSaving(true)
     try {
+      const assignees = users
+        .filter((u) => assigneeIds.includes(u.userId))
+        .map((u) => ({ userId: u.userId, label: u.label }))
       const created = await createTask({
         title: title.trim(),
         description: description.trim(),
         priority,
         dueDate: dueDate || undefined,
         category,
-        assigneeId: assigneeId || undefined,
+        assignees,
+        assigneeId: assignees[0]?.userId,
         status: 'backlog',
       })
       if (!created) {
@@ -224,7 +514,7 @@ function CreateTaskModal({
       setPriority('medium')
       setDueDate('')
       setCategory('General')
-      setAssigneeId('')
+      setAssigneeIds([])
       onClose()
     } finally {
       setSaving(false)
@@ -259,25 +549,20 @@ function CreateTaskModal({
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </label>
         </div>
-        <div className="at-create-row">
-          <label>
-            Categoría
-            <select value={category} onChange={(e) => setCategory(e.target.value)}>
-              {TASK_CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Responsable
-            <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
-              <option value="">Sin asignar</option>
-              {users.map((u) => (
-                <option key={u.userId} value={u.userId}>{u.label}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <label>
+          Categoría
+          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+            {TASK_CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </label>
+        <MultiAssigneePicker
+          users={users}
+          selectedIds={assigneeIds}
+          onChange={setAssigneeIds}
+          label="Responsables (puedes elegir varios)"
+        />
         <div className="at-create-actions">
           <button type="button" className="secondary" onClick={onClose}>Cancelar</button>
           <button type="button" className="primary" disabled={saving} onClick={() => void submit()}>
@@ -291,7 +576,8 @@ function CreateTaskModal({
 
 export function AssistantTasksPage() {
   const roles = useAuthStore((s) => s.roles)
-  const readonly = !canMutate(roles)
+  const session = useAuthStore((s) => s.session)
+  const readonly = !canMutate(roles, session?.login)
   const [searchParams, setSearchParams] = useSearchParams()
   const [tasks, setTasks] = useState<TaskRecord[]>([])
   const [activity, setActivity] = useState<ActivityItem[]>([])
@@ -323,7 +609,18 @@ export function AssistantTasksPage() {
   }, [load])
 
   const counts = useMemo(() => taskSummaryCounts(tasks), [tasks])
-  const filtered = useMemo(() => filterTasksByTime(tasks.filter(isOpenTask), timeFilter), [tasks, timeFilter])
+  // Lista: solo abiertas. Tablero: incluye Completada para poder mover ida y vuelta.
+  const listTasks = useMemo(
+    () => filterTasksByTime(tasks.filter(isOpenTask), timeFilter),
+    [tasks, timeFilter],
+  )
+  const boardTasks = useMemo(() => {
+    if (timeFilter === 'all') return tasks
+    const openMatching = filterTasksByTime(tasks.filter(isOpenTask), timeFilter)
+    const matchingIds = new Set(openMatching.map((t) => t.id))
+    // Mantener en Completada las que ya están done (para poder regresarlas)
+    return tasks.filter((t) => matchingIds.has(t.id) || t.status === 'done')
+  }, [tasks, timeFilter])
   const pending = useMemo(() => pendingTasks(tasks), [tasks])
   const overdue = useMemo(() => overdueTasks(tasks), [tasks])
   const completedRecent = useMemo(() => recentlyCompletedTasks(tasks, 6), [tasks])
@@ -332,30 +629,60 @@ export function AssistantTasksPage() {
   const closeTask = () => setSearchParams({})
 
   const markDone = async (id: string) => {
+    const previous = tasks
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: 'done' } : t)))
     const ok = await moveTaskStatus(id, 'done')
     if (!ok) {
+      setTasks(previous)
       toastError('No se pudo marcar como hecha.')
       return
     }
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: 'done' } : t)))
     toastSuccess('Tarea completada.')
   }
 
-  const handleAssign = async (taskId: string, userId: string) => {
-    const user = assigneeOptions.find((u) => u.userId === userId)
-    const ok = await assignTask(taskId, userId || null, user?.label)
+  const moveStatus = async (id: string, status: TaskStatus) => {
+    const previous = tasks
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)))
+    const ok = await moveTaskStatus(id, status)
     if (!ok) {
-      toastError('No se pudo cambiar el responsable.')
+      setTasks(previous)
+      toastError('No se pudo mover la tarea.')
       return
     }
+    toastSuccess(`Movida a ${TASK_STATUS_LABELS[status]}.`)
+  }
+
+  const handleAssign = async (taskId: string, userIds: string[]) => {
+    const assignees = assigneeOptions
+      .filter((u) => userIds.includes(u.userId))
+      .map((u) => ({ userId: u.userId, label: u.label }))
+    const ok = await setTaskAssignees(taskId, assignees)
+    if (!ok) {
+      toastError('No se pudieron actualizar los responsables.')
+      return
+    }
+    const label = assignees.length === 0
+      ? 'Sin asignar'
+      : assignees.map((a) => a.label).join(' · ')
     setTasks((prev) =>
       prev.map((t) =>
         t.id === taskId
-          ? { ...t, assigneeId: userId || undefined, assignee: user?.label ?? 'Sin asignar' }
+          ? {
+              ...t,
+              assignees,
+              assigneeId: assignees[0]?.userId,
+              assignee: label,
+            }
           : t,
       ),
     )
-    toastSuccess('Responsable actualizado.')
+    toastSuccess(
+      assignees.length === 0
+        ? 'Sin responsables.'
+        : assignees.length === 1
+          ? 'Responsable actualizado.'
+          : `${assignees.length} responsables actualizados.`,
+    )
   }
 
   const handleComment = async (taskId: string, body: string) => {
@@ -415,39 +742,22 @@ export function AssistantTasksPage() {
       {loading ? (
         <p className="empty-state">Cargando tareas…</p>
       ) : view === 'kanban' ? (
-        <div className="at-kanban">
-          {STATUS_COLUMNS.map((col) => {
-            const colTasks = filtered.filter((t) => t.status === col.id)
-            return (
-              <section key={col.id} className="at-kanban-col">
-                <header><span>{col.title}</span><b>{colTasks.length}</b></header>
-                <div className="at-kanban-body">
-                  {colTasks.map((task) => (
-                    <TaskQuickCard
-                      key={task.id}
-                      task={task}
-                      readonly={readonly}
-                      users={assigneeOptions}
-                      onOpen={() => openTask(task.id)}
-                      onDone={() => void markDone(task.id)}
-                      onAssign={(userId) => void handleAssign(task.id, userId)}
-                      onComment={(body) => void handleComment(task.id, body)}
-                    />
-                  ))}
-                  {colTasks.length === 0 ? (
-                    <p className="at-empty-col">Nada aquí por ahora.</p>
-                  ) : null}
-                </div>
-              </section>
-            )
-          })}
-        </div>
+        <AssistantKanban
+          tasks={boardTasks}
+          readonly={readonly}
+          users={assigneeOptions}
+          onOpen={openTask}
+          onDone={(id) => void markDone(id)}
+          onAssign={(taskId, userIds) => void handleAssign(taskId, userIds)}
+          onComment={(taskId, body) => void handleComment(taskId, body)}
+          onMove={(taskId, status) => void moveStatus(taskId, status)}
+        />
       ) : (
         <div className="card at-list">
-          {filtered.length === 0 ? (
+          {listTasks.length === 0 ? (
             <p className="empty-state">No hay tareas con este filtro. ¡Buen trabajo!</p>
           ) : (
-            filtered.map((task) => (
+            listTasks.map((task) => (
               <TaskQuickCard
                 key={task.id}
                 task={task}
@@ -455,7 +765,7 @@ export function AssistantTasksPage() {
                 users={assigneeOptions}
                 onOpen={() => openTask(task.id)}
                 onDone={() => void markDone(task.id)}
-                onAssign={(userId) => void handleAssign(task.id, userId)}
+                onAssign={(userIds) => void handleAssign(task.id, userIds)}
                 onComment={(body) => void handleComment(task.id, body)}
               />
             ))

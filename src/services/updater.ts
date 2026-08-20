@@ -7,16 +7,20 @@ export type UpdateCheckResult =
   | { status: 'available'; version: string; notes?: string }
   | { status: 'installed'; version: string }
 
-const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? '1.0.6'
+const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? '1.0.7'
 
-/** Token opcional para repos privados de GitHub (solo lectura de releases). */
+/**
+ * Token opcional para repos privados de GitHub (solo lectura de releases).
+ * No enviar `Accept: application/vnd.github+json`: ese media type es de la API
+ * y haría que GitHub devolviera metadatos JSON en vez del instalador. El plugin
+ * pone `application/json` en check() y `application/octet-stream` en download().
+ */
 function updaterRequestOptions() {
   const token = import.meta.env.VITE_GITHUB_RELEASES_TOKEN?.trim()
   if (!token) return undefined
   return {
     headers: {
       Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github+json',
     },
   }
 }
@@ -61,6 +65,13 @@ export async function checkForAppUpdate(): Promise<UpdateCheckResult> {
       return {
         status: 'unavailable',
         message: 'No hay releases publicados todavía o el repositorio requiere token de GitHub.',
+      }
+    }
+    if (message.toLowerCase().includes('error decoding response body')) {
+      return {
+        status: 'unavailable',
+        message:
+          'GitHub devolvió latest.json en un formato que el updater no pudo leer. Suele ser un BOM UTF-8 o una página HTML de login (repo privado sin token).',
       }
     }
     return { status: 'unavailable', message }

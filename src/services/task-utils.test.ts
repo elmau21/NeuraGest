@@ -18,6 +18,7 @@ function task(partial: Partial<TaskRecord> & { id: string; title: string }): Tas
     status: 'progress',
     priority: 'medium',
     assignee: 'Equipo',
+    assignees: [],
     tags: [],
     estimate: 1,
     position: 0,

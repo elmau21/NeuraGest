@@ -65,6 +65,10 @@ Endpoint configurado:
 https://github.com/elmau21/NeuraGest/releases/latest/download/latest.json
 ```
 
+`latest.json` debe ser **UTF-8 sin BOM**. En Windows, `Set-Content -Encoding utf8` escribe `EF BB BF` y el updater de Tauri falla con `error decoding response body` (GitHub sirve el archivo como `application/octet-stream`; eso es normal y no es la causa). `scripts/prepare-updater-manifest.ps1` ya escribe UTF-8 sin BOM.
+
+El plugin pone `Accept: application/json` al comprobar y `Accept: application/octet-stream` al descargar el `.exe`. No envíes `Accept: application/vnd.github+json` en `check()`: ese media type es de la API de GitHub y puede devolver metadatos del asset en vez del JSON/binario.
+
 ## 3. Repo privado y token
 
 Los assets de un repo **privado** requieren autenticación. Opciones:
@@ -75,7 +79,9 @@ Los assets de un repo **privado** requieren autenticación. Opciones:
 
 3. **Alternativa:** bucket público (Supabase Storage, S3) con `latest.json` + instalador.
 
-Sin token y con repo privado, la app mostrará error al buscar updates.
+Sin token y con repo privado, GitHub redirige a HTML de login y la app muestra `error decoding response body` (el cuerpo no es JSON). El token se pasa como `Authorization: Bearer …` en `check()`; GitHub redirige al CDN (`release-assets.githubusercontent.com`) con un JWT en la query. Eso es el flujo correcto.
+
+Si el decode falla **después** de llegar al CDN, el manifiesto suele tener BOM o no ser JSON válido. Regenera y vuelve a subir solo `latest.json` al release (`gh release upload vX.Y.Z latest.json --clobber`). **No hace falta un .exe nuevo** para ese error.
 
 ## 4. Publicar una versión (owner)
 
@@ -141,6 +147,7 @@ Artefactos:
 - [ ] `plugins.updater.pubkey` con clave real (no el placeholder)
 - [ ] Secrets de firma y (si aplica) `GITHUB_RELEASES_TOKEN` en GitHub
 - [ ] Tag `vX.Y.Z` pusheado
+- [ ] `latest.json` en el release es UTF-8 **sin BOM** (el script ya lo garantiza)
 - [ ] Probar «Buscar actualizaciones» en Ajustes con una versión anterior instalada
 
 ## Code signing Windows (SmartScreen)
