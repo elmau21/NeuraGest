@@ -1,0 +1,11 @@
+{
+    "version":  "1.0.8",
+    "notes":  "NeuraGest 1.0.8",
+    "pub_date":  "2026-08-20T22:13:21Z",
+    "platforms":  {
+                      "windows-x86_64":  {
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRczhkNFhTdFA0cUtsUHNTMHNqMVN1ajBRaTNQYXBGL0NZR3RzWE9kVjdnZ2VBdWxyZ2o0dkw1SkhRR2dMVUxHT0Ivb1VJaVF3ekdrUW03U3VtdU0vT3RnN0ZtcStoQ0FjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3MjYzOTkxCWZpbGU6TmV1cmFHZXN0XzEuMC44X3g2NC1zZXR1cC5leGUKcEZRV1dJQ3d0ZTcwdS9ub0JZaVU2SkI5MWZxRVZNVDE2MTJ1WmdXaVJvUHZDcW5MUUxyYzhGR0ZvVVhOQURGNkVpVjhYdnhGVmNnL2JySElOQnlyQlE9PQo=",
+                                             "url":  "https://github.com/elmau21/NeuraGest/releases/download/v1.0.8/NeuraGest_1.0.8_x64-setup.exe"
+                                         }
+                  }
+}

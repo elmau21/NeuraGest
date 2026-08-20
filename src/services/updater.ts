@@ -78,7 +78,17 @@ export async function checkForAppUpdate(): Promise<UpdateCheckResult> {
   }
 }
 
-export async function installAppUpdate(): Promise<UpdateCheckResult> {
+export type UpdateInstallProgress = {
+  /** 0–100 cuando se conoce el tamaño; null si aún no hay total */
+  percent: number | null
+  downloadedBytes: number
+  totalBytes: number | null
+  phase: 'downloading' | 'installing'
+}
+
+export async function installAppUpdate(
+  onProgress?: (progress: UpdateInstallProgress) => void,
+): Promise<UpdateCheckResult> {
   if (!isTauri) {
     return { status: 'unavailable', message: 'Actualizaciones solo en la app de escritorio.' }
   }
@@ -88,6 +98,44 @@ export async function installAppUpdate(): Promise<UpdateCheckResult> {
     return { status: 'up-to-date', currentVersion: APP_VERSION }
   }
 
-  await update.downloadAndInstall()
+  let downloadedBytes = 0
+  let totalBytes: number | null = null
+
+  await update.downloadAndInstall((event) => {
+    if (event.event === 'Started') {
+      downloadedBytes = 0
+      totalBytes = event.data.contentLength ?? null
+      onProgress?.({
+        percent: totalBytes && totalBytes > 0 ? 0 : null,
+        downloadedBytes: 0,
+        totalBytes,
+        phase: 'downloading',
+      })
+      return
+    }
+    if (event.event === 'Progress') {
+      downloadedBytes += event.data.chunkLength
+      const percent =
+        totalBytes && totalBytes > 0
+          ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100))
+          : null
+      onProgress?.({
+        percent,
+        downloadedBytes,
+        totalBytes,
+        phase: 'downloading',
+      })
+      return
+    }
+    if (event.event === 'Finished') {
+      onProgress?.({
+        percent: 100,
+        downloadedBytes,
+        totalBytes,
+        phase: 'installing',
+      })
+    }
+  })
+
   return { status: 'installed', version: update.version }
 }
