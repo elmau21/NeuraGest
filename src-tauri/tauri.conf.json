@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "NeuraGest",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "identifier": "com.neuralive.neuragest",
   "build": {
     "frontendDist": "../dist",
@@ -18,7 +18,7 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
-    "targets": ["nsis", "msi"],
+    "targets": ["nsis", "msi", "deb"],
     "publisher": "NeuraLive",
     "shortDescription": "GestiÃ³n profesional de talentos Twitch",
     "longDescription": "Dashboard, operaciones, documentos y analÃ­tica para la agencia NeuraLive.",

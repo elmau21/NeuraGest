@@ -4,12 +4,12 @@ Aplicación de escritorio de NeuraLive para gestionar talentos Twitch, operacion
 
 ## Stack
 
-- Tauri v2 + Rust (NSIS/MSI, updater, notificaciones y logs)
+- Tauri v2 + Rust (NSIS/MSI en Windows, `.deb` en Linux/Chromebook; updater en Windows)
 - React 19, TypeScript, Vite 8, Tailwind CSS 4, shadcn/ui, Framer Motion
 - Zustand, Recharts, TipTap, dnd-kit
 - Supabase PostgreSQL/Auth/Realtime/Storage con RLS
 - SQLite local en modo WAL para caché y cola de sincronización
-- Twitch OAuth Device Code Flow, Helix y almacenamiento en Windows Credential Manager
+- Twitch OAuth Device Code Flow, Helix y almacenamiento seguro (Credential Manager / libsecret)
 
 ## Requisitos Windows
 
@@ -90,7 +90,21 @@ Artefactos esperados:
 - `src-tauri/target/release/bundle/nsis/NeuraGest_1.0.0_x64-setup.exe`
 - `src-tauri/target/release/bundle/msi/NeuraGest_1.0.0_x64_en-US.msi`
 
-Para publicar auto-updates con GitHub Releases, sigue [docs/RELEASE.md](docs/RELEASE.md): genera claves Tauri, configura `plugins.updater.pubkey`, secrets de CI y publica con `git tag vX.Y.Z && git push origin vX.Y.Z`. El plugin ya está integrado; el equipo verá «Hay una actualización disponible» en Ajustes.
+## Build Linux / Chromebook
+
+En Linux (o Crostini en Chromebook Intel/AMD):
+
+```bash
+npm run tauri:build:linux
+# o validación completa:
+npm run build:linux
+```
+
+Artefacto: `src-tauri/target/release/bundle/deb/NeuraGest_*_amd64.deb`
+
+Guía de instalación en Chromebook: [docs/CHROMEBOOK.md](docs/CHROMEBOOK.md). El auto-updater Tauri solo aplica a Windows; en Linux reinstala el `.deb` desde Releases.
+
+Para publicar auto-updates con GitHub Releases, sigue [docs/RELEASE.md](docs/RELEASE.md): genera claves Tauri, configura `plugins.updater.pubkey`, secrets de CI y publica con `git tag vX.Y.Z && git push origin vX.Y.Z`. El plugin ya está integrado en Windows; el equipo verá «Hay una actualización disponible» en Ajustes.
 
 ## Arquitectura
 

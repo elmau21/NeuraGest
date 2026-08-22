@@ -44,6 +44,11 @@ jobs:
       - name: Install frontend deps (Tauri build hook)
         run: npm ci
 
+      - name: Install Linux deps (keyring / Tauri)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsecret-1-dev
+
       - name: Cargo check
         working-directory: src-tauri
         run: cargo check

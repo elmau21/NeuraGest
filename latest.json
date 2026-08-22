@@ -1,6 +1,6 @@
 {
-  "version": "1.0.9",
-  "notes": "NeuraGest 1.0.9 — Vision UI, UX 7-15: búsqueda global, atajos, permisos, offline, notificaciones y accesibilidad.",
+  "version": "1.0.10",
+  "notes": "NeuraGest 1.0.10 — Vision UI, paleta magenta NeuraLive, UX 1-15, corrección CSS completo, hero bloom, soporte Chromebook Linux (.deb).",
   "pub_date": "2026-08-23T00:00:00Z",
   "platforms": {}
 }

@@ -1,6 +1,6 @@
 [package]
 name = "neuragest"
-version = "1.0.9"
+version = "1.0.10"
 description = "NeuraGest — gestión profesional de talentos Twitch"
 authors = ["NeuraLive"]
 license = "Proprietary"
@@ -32,7 +32,7 @@ portpicker = "0.1"
 reqwest = { version = "0.13", features = ["json", "form"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "sync"] }
 url = "2"
-keyring = { version = "3", features = ["windows-native"] }
+keyring = { version = "3", features = ["linux-native", "windows-native"] }
 rusqlite = { version = "0.39", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
