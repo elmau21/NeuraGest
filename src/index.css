@@ -157,10 +157,10 @@
 
 .auth-screen{position:relative;min-height:100vh;display:grid;place-items:center;padding:32px 20px;overflow:hidden;background:#09090b}.auth-screen--loading{gap:14px;color:#8b8b97;font-size:13px}.auth-loader{width:34px;height:34px;border-radius:50%;border:2px solid #2b2b34;border-top-color:#9146ff;animation:bi-spin .9s linear infinite}.auth-bg-glow{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none}.auth-bg-glow--purple{width:420px;height:420px;background:#7c3aed33;top:-80px;left:-60px}.auth-bg-glow--blue{width:360px;height:360px;background:#2563eb22;bottom:-100px;right:-40px}.auth-card{position:relative;width:min(480px,100%);background:linear-gradient(180deg,#131317ee,#0f0f12ee);border:1px solid #2a2a32;border-radius:18px;padding:32px 28px 24px;box-shadow:0 30px 80px #0006}.auth-brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}.auth-brand-mark{width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,#ED34D6,#470872);display:grid;place-items:center;font-weight:800;font-size:18px}.auth-brand-name{display:block;font-size:18px;font-weight:700;letter-spacing:-.3px}.auth-brand-tag{display:block;color:#686875;font-size:11px;margin-top:2px}.auth-overline{display:block;color:#7c8ba5;font:600 9px "JetBrains Mono",monospace;letter-spacing:1.2px;margin-bottom:10px}.auth-hero h1{font-size:28px;line-height:1.08;letter-spacing:-.8px;margin-bottom:10px}.auth-hero p{color:#8b8b97;font-size:13px;line-height:1.65}.auth-cta-block{margin-top:28px;display:flex;flex-direction:column;gap:12px}.auth-twitch-btn{border:0;border-radius:10px;padding:12px 16px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;background:#9146ff;color:#fff;transition:background .15s,transform .15s}.auth-twitch-btn:hover:not(:disabled){background:#a970ff;transform:translateY(-1px)}.auth-twitch-btn:disabled{opacity:.6;cursor:wait}.auth-twitch-btn--hero{width:100%;padding:14px 18px;font-size:14px}.auth-secondary-btn{border:1px solid var(--border);background:#18181d;border-radius:9px;padding:10px 14px;font-size:12px;font-weight:600;cursor:pointer;color:#c8c8d0}.auth-note{color:#71717c;font-size:11px;line-height:1.55}.auth-note code{font:500 10px "JetBrains Mono",monospace;background:#1b1b22;padding:2px 5px;border-radius:4px;color:#c4b5fd}.auth-note--warn{color:#fbbf24}.auth-note--error{color:#fb7185}.auth-footer{margin-top:28px;padding-top:16px;border-top:1px solid #24242b;color:#55555f;font-size:10px;text-align:center}.auth-device-panel{margin-top:24px;padding:18px;border:1px solid #2d2d36;border-radius:12px;background:#111114}.auth-device-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:12px;font-weight:600}.auth-device-head small{color:#71717c;font-weight:500;font-size:10px}.auth-device-copy{color:#8b8b97;font-size:12px;line-height:1.5;margin-bottom:12px}.auth-device-copy strong{color:#e4e4e7}.auth-user-code{width:100%;border:1px dashed #9146ff66;background:#9146ff14;border-radius:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;color:#fff;margin-bottom:14px}.auth-user-code span{font:700 22px "JetBrains Mono",monospace;letter-spacing:3px}.auth-device-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}.auth-device-waiting,.auth-device-loading,.auth-device-success,.auth-device-error{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:12px;color:#9d9da8}.auth-device-error{flex-wrap:wrap;color:#fb7185}.auth-device-error b,.auth-device-success b{display:block;color:#e4e4e7;font-size:12px}.auth-device-error p,.auth-device-success p{font-size:11px;color:#8b8b97;margin-top:3px}.auth-device-success{color:#34d399}.settings-session-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.session-connection{margin-top:16px}.session-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover}.user-menu-wrap{position:relative}.user-avatar img{width:100%;height:100%;border-radius:50%;object-fit:cover}.user-menu{position:absolute;right:0;top:calc(100% + 8px);min-width:190px;background:#151519;border:1px solid #3b3b46;border-radius:10px;box-shadow:0 20px 50px #0008;overflow:hidden;z-index:30}.user-menu-head{padding:12px 14px;border-bottom:1px solid var(--border)}.user-menu-head b{display:block;font-size:12px}.user-menu-head span{display:block;color:#71717c;font-size:10px;margin-top:3px}.user-menu>button{width:100%;border:0;background:none;color:#e4e4e7;padding:11px 14px;display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer}.user-menu>button:hover{background:#222228}
 
-/* NeuraLive brand assets — logotype nearly square; cap height so brand dominates without crushing nav */
+/* NeuraLive brand assets â logotype nearly square; cap height so brand dominates without crushing nav */
 .brand-logotype{width:auto;height:80px;max-width:92%;max-height:none;object-fit:contain;display:block;margin:0 auto}
 
-/* Sidebar — calmer density, soft motion */
+/* Sidebar â calmer density, soft motion */
 .app-shell>aside{
   transition:width .24s cubic-bezier(.22,.61,.36,1),transform .22s ease;
 }
@@ -304,7 +304,7 @@
 .splash-logo{width:min(300px,74vw);height:auto;object-fit:contain;filter:drop-shadow(0 24px 70px #7c3aed55)}
 .splash-status{position:absolute;bottom:48px;color:#71717c;font-size:12px;letter-spacing:.02em;margin:0}
 
-/* Módulos agencia */
+/* MÃ³dulos agencia */
 .page-actions{display:flex;gap:8px;align-items:center}
 .agency-gate{padding:24px;color:var(--muted);font-size:13px}
 .agency-board{grid-template-columns:repeat(3,minmax(240px,1fr))}
@@ -1197,7 +1197,7 @@
 @media(max-width:700px){.tp-header{display:grid;grid-template-columns:auto 1fr}.tp-header-actions{grid-column:1/-1}.tp-perf-grid{grid-template-columns:1fr}.tp-lifetime-grid{grid-template-columns:repeat(2,1fr)}}
 .talent-row-clickable{cursor:pointer;transition:background .15s ease}.talent-row-clickable:focus-visible{outline:1px solid #8b5cf6;outline-offset:-1px}
 
-/* Usuarios activos (Presence) — overrides de refinamiento */
+/* Usuarios activos (Presence) â overrides de refinamiento */
 .presence-badge-wrap>button{color:#c4b5fd}
 .presence-avatars{display:flex;align-items:center}
 .presence-avatars img,.presence-avatar-fallback{width:22px;height:22px;border-radius:50%;border:2px solid #121216;margin-left:-6px;object-fit:cover;background:#302449;display:grid;place-items:center;font-size:9px;font-weight:700;color:#c4b5fd}
@@ -1696,12 +1696,12 @@
 }
 
 
-/* ═══ Vision UI — NeuraGest brand (magenta) ═══ */
+/* âââ Vision UI â NeuraGest brand (magenta) âââ */
 @media(prefers-reduced-motion:reduce){
   .app-shell>aside.collapsed nav a[data-nav-label]::after{transition:none!important}
 }
 
-/* ═══ Vision UI — NeuraGest design system ═══ */
+/* âââ Vision UI â NeuraGest design system âââ */
 body{background:var(--bg-app);color:var(--text-primary)}
 .glass-card,.card{
   background:var(--bg-card);
@@ -2221,7 +2221,7 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{
   padding:28px 32px;
   background:linear-gradient(135deg,rgba(24,0,34,.85) 0%,rgba(13,0,21,.75) 45%,rgba(71,8,114,.25) 100%);
   border-color:rgba(237,52,214,.25);
-  overflow:hidden;
+  overflow:visible;
   position:relative;
 }
 .control-center .cc-hero-content{min-width:0;flex:1;z-index:1}
@@ -2245,12 +2245,15 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{
 }
 .control-center .cc-hero-orb{
   position:absolute;
-  width:140px;
-  height:140px;
+  inset:50% auto auto 50%;
+  width:160px;
+  height:160px;
+  transform:translate(-50%,-50%);
   border-radius:50%;
-  background:radial-gradient(circle at 30% 30%,#ED34D6,#470872 40%,transparent 70%);
-  filter:blur(28px);
-  opacity:.75;
+  background:radial-gradient(circle at center,rgba(237,52,214,.55) 0%,rgba(71,8,114,.3) 38%,transparent 68%);
+  filter:blur(36px);
+  opacity:.8;
+  pointer-events:none;
   animation:cc-orb-pulse 4s ease-in-out infinite;
 }
 .control-center .cc-hero-logo{
@@ -2259,7 +2262,7 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{
   filter:drop-shadow(0 0 24px rgba(237,52,214,.5));
   position:relative;
 }
-@keyframes cc-orb-pulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.08);opacity:.9}}
+@keyframes cc-orb-pulse{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.75}50%{transform:translate(-50%,-50%) scale(1.06);opacity:.9}}
 .vision-gauge{
   display:flex;
   flex-direction:column;
@@ -2346,15 +2349,15 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{
 .my-day-card{text-decoration:none;color:inherit}
 .my-day-live-pulse{color:#f43f5e;margin-left:auto;flex:none}
 
-/* cc-hero overflow guard */
-.control-center .cc-welcome.cc-hero{max-height:min(200px,22vh)}
+/* cc-hero overflow guard — logo size only; glow must not clip */
+.control-center .cc-welcome.cc-hero{max-height:min(200px,22vh);overflow:visible}
 .control-center .cc-hero-brand{
   width:min(180px,26vw);
   max-height:140px;
   min-height:0;
-  overflow:hidden;
+  overflow:visible;
 }
-.control-center .cc-hero-orb{width:min(120px,18vw);height:min(120px,18vw);max-width:120px;max-height:120px}
+.control-center .cc-hero-orb{width:min(150px,22vw);height:min(150px,22vw);max-width:150px;max-height:150px}
 .control-center .cc-hero-logo{
   max-width:min(130px,20vw);
   max-height:72px;
@@ -2369,7 +2372,7 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{
 @media(max-width:820px){.ps-kpi-strip{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:520px){.ps-kpi-strip{grid-template-columns:1fr}}
 
-/* ═══ Vision UI — Auth, modales, popovers, toasts ═══ */
+/* âââ Vision UI â Auth, modales, popovers, toasts âââ */
 .auth-screen,.no-role-screen,.splash-screen{
   background:var(--bg-app);
   background-image:
@@ -2540,7 +2543,7 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{
   box-shadow:0 12px 40px rgba(0,0,0,.4),0 0 20px rgba(237,52,214,.1);
 }
 
-/* ═══ Vision UI — KPI grids, tablas, formularios ops ═══ */
+/* âââ Vision UI â KPI grids, tablas, formularios ops âââ */
 .kpi-grid>.card span,.agency-kpi .card span,.ops-kpi-4>.card span{
   font-size:10px;
   text-transform:uppercase;
@@ -2626,7 +2629,7 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{
   border:1px solid rgba(255,255,255,.06);
 }
 
-/* ═══ Vision UI — CRM, comisiones, media kit ═══ */
+/* âââ Vision UI â CRM, comisiones, media kit âââ */
 .crm-sla-kpi small{color:rgba(255,255,255,.45)}
 .crm-sla-badge{font-weight:700;letter-spacing:.04em}
 .agency-progress i{
@@ -2647,7 +2650,7 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{
   box-shadow:0 4px 16px rgba(0,0,0,.2);
 }
 
-/* ═══ Vision UI — Documentos (sin romper PDF) ═══ */
+/* âââ Vision UI â Documentos (sin romper PDF) âââ */
 .contracts-panel,.doc-drive-panel{
   background:rgba(255,255,255,.03);
   backdrop-filter:blur(20px);
@@ -2689,7 +2692,7 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{
 }
 .contract-viewer iframe{background:#1a1a22}
 
-/* ═══ Vision UI — Calendario, kanban, wiki ═══ */
+/* âââ Vision UI â Calendario, kanban, wiki âââ */
 .event{
   border-radius:8px;
   backdrop-filter:blur(8px);
@@ -2733,7 +2736,7 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{
 }
 .docs-tree button:hover{background:rgba(255,255,255,.06);color:#fff}
 
-/* ═══ Vision UI — Ajustes, owner assistant, integraciones ═══ */
+/* âââ Vision UI â Ajustes, owner assistant, integraciones âââ */
 .settings-tabs button{
   border-radius:8px;
   transition:all .15s ease;
@@ -2804,7 +2807,7 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{
   border-radius:10px;
 }
 
-/* ═══ Vision UI — Event Fichas, pipeline, onboarding, portal ═══ */
+/* âââ Vision UI â Event Fichas, pipeline, onboarding, portal âââ */
 .ef-summary .at-stat,.ef-stat-idea,.ef-stat-planificacion,.ef-stat-produccion,.ef-stat-publicado,.ef-stat-cerrado{
   border-radius:16px;
   background:rgba(255,255,255,.03);
@@ -2907,7 +2910,7 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{
 .priority.urgent{box-shadow:0 0 8px rgba(239,68,68,.2)}
 .column-empty{color:rgba(255,255,255,.4)}
 @media(max-width:960px){.ef-layout.with-panel{grid-template-columns:1fr}}
-/* UX v1.0.9 — búsqueda, atajos, offline, accesibilidad */
+/* UX v1.0.9 â bÃºsqueda, atajos, offline, accesibilidad */
 .empty-state.is-loading::after{
   content:'';
   display:inline-block;
