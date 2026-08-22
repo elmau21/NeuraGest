@@ -38,11 +38,11 @@ jobs:
           (Get-Content src-tauri/Cargo.toml -Raw) -replace '(?m)^version = ".*"$', "version = `"$version`"" | Set-Content src-tauri/Cargo.toml
 
       - name: Inyectar clave pública del updater
-        if: ${{ secrets.TAURI_SIGNING_PUBLIC_KEY != '' }}
         shell: pwsh
         env:
           TAURI_SIGNING_PUBLIC_KEY: ${{ secrets.TAURI_SIGNING_PUBLIC_KEY }}
         run: |
+          if (-not $env:TAURI_SIGNING_PUBLIC_KEY) { Write-Host "Sin TAURI_SIGNING_PUBLIC_KEY; se usa pubkey del repo."; exit 0 }
           $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
           $conf.plugins.updater.pubkey = $env:TAURI_SIGNING_PUBLIC_KEY
           $conf | ConvertTo-Json -Depth 20 | Set-Content src-tauri/tauri.conf.json
@@ -91,9 +91,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
+            libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
+            libsecret-1-dev \
             libssl-dev
 
       - name: Instalar dependencias npm
