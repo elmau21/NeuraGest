@@ -63,8 +63,8 @@ export function AtypicalCategoryRadar({ talents }: { talents: CategoryRadarTalen
               <Radar
                 name="Share %"
                 dataKey="share"
-                stroke="#8b5cf6"
-                fill="#8b5cf6"
+                stroke="#ED34D6"
+                fill="#ED34D6"
                 fillOpacity={0.35}
               />
               <Tooltip contentStyle={tooltipStyle} formatter={(value) => [`${value}%`, 'Share histórico']} />

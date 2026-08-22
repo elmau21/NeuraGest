@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertOctagon, CalendarDays, CheckSquare, Clock, Plus, RefreshCw, ShieldAlert, Trash2 } from '@/components/icons'
+import { useSearchParams } from 'react-router-dom'
+import { AlertOctagon, CalendarDays, CheckSquare, Clock, Handshake, Plus, RefreshCw, ShieldAlert, Trash2 } from '@/components/icons'
 import { Link } from 'react-router-dom'
 import {
   deleteSponsorshipDeal,
@@ -16,10 +17,13 @@ import { detectDealConflicts, hasBlockingConflicts } from '@/services/deal-confl
 import { summarizeCrmSla } from '@/services/crm-sla'
 import { isTauri } from '@/services/twitch'
 import { logCrmDealActivity } from '@/services/audit'
+import { EmptyState } from '@/components/EmptyState'
+import { RowActionMenu } from '@/components/RowActionMenu'
 
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 })
 
 export function CrmPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [deals, setDeals] = useState<SponsorshipDeal[]>([])
   const [talents, setTalents] = useState<DbTalent[]>([])
   const [restrictions, setRestrictions] = useState<BrandRestriction[]>([])
@@ -90,6 +94,16 @@ export function CrmPage() {
     setDraft(deal)
     setEditorOpen(true)
   }
+
+  useEffect(() => {
+    const dealId = searchParams.get('deal')
+    if (!dealId || deals.length === 0) return
+    const match = deals.find((deal) => deal.id === dealId)
+    if (match) {
+      openEdit(match)
+      setSearchParams({}, { replace: true })
+    }
+  }, [deals, searchParams, setSearchParams])
 
   const save = async () => {
     if (!draft.brandName.trim()) return
@@ -212,12 +226,16 @@ export function CrmPage() {
 
       {error && <p className="integration-note">{error}</p>}
 
+      {loading && deals.length === 0 ? (
+        <p className="empty-state is-loading">Cargando patrocinios…</p>
+      ) : (
       <div className="card">
         <div className="toolbar">
           <label className="search">
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar marca o talento…" />
           </label>
         </div>
+        <div className="table-scroll-wrap agency-crm-scroll">
         <div className="agency-crm-table">
           <div className="table-header agency-crm-head">
             <span>Marca</span><span>Talento</span><span>Valor</span><span>Entregables</span><span>Fechas</span><span>Avance</span><span>SLA</span><span>Estado</span><span />
@@ -246,13 +264,30 @@ export function CrmPage() {
               <span className="agency-crm-links">
                 {deal.taskId && <Link to="/tareas" title="Ver tareas"><CheckSquare size={14} /></Link>}
                 {deal.calendarEventId && <Link to="/calendario" title="Ver calendario"><CalendarDays size={14} /></Link>}
-                <button className="icon-btn" onClick={() => void remove(deal.id)} aria-label="Eliminar"><Trash2 size={14} /></button>
+                <RowActionMenu
+                  actions={[
+                    { id: 'edit', label: 'Ver deal', onClick: () => openEdit(deal) },
+                    { id: 'delete', label: 'Eliminar', danger: true, onClick: () => void remove(deal.id) },
+                  ]}
+                />
               </span>
             </div>
           )})}
-          {!loading && filtered.length === 0 && <p className="empty-state">No hay patrocinios registrados.</p>}
+          {!loading && filtered.length === 0 && (
+            <EmptyState
+              icon={Handshake}
+              title="No hay patrocinios registrados"
+              description="Empieza agregando una marca o contacto comercial para dar seguimiento."
+            >
+              <button className="primary" onClick={openNew}>
+                <Plus size={16} /> Crear deal
+              </button>
+            </EmptyState>
+          )}
+        </div>
         </div>
       </div>
+      )}
 
       {editorOpen && (
         <div className="modal-backdrop" onClick={() => setEditorOpen(false)}>

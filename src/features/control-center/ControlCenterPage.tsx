@@ -15,6 +15,7 @@ import {
   Database,
   EyeOff,
   LayoutTemplate,
+  Loader2,
   ListChecks,
   ListTodo,
   Megaphone,
@@ -82,6 +83,8 @@ import {
   type OpsAlert,
 } from '@/services/control-center-inbox'
 import { AssistantTasksSummary } from '@/features/control-center/AssistantTasksSummary'
+import { VisionGauge } from '@/components/VisionGauge'
+import { neuraliveLogotype } from '@/assets/brand'
 import {
   claimOpsCoverage,
   clearOpsCoverage,
@@ -267,6 +270,14 @@ export function ControlCenterPage() {
   )
 
   const liveTalents = useMemo(() => talents.filter((t) => t.isLive), [talents])
+  const averageLiveViewers = useMemo(() => {
+    if (!liveTalents.length) return 0
+    return Math.round(liveTalents.reduce((sum, t) => sum + t.viewers, 0) / liveTalents.length)
+  }, [liveTalents])
+  const gaugeMaxViewers = useMemo(
+    () => Math.max(100, ...talents.map((t) => t.viewers), averageLiveViewers),
+    [talents, averageLiveViewers],
+  )
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -479,6 +490,11 @@ export function ControlCenterPage() {
         scheduledStreams,
       }),
     [helixStatus, talents, events, vods, contractEnds, scheduledStreams],
+  )
+
+  const inboxActiveCount = useMemo(
+    () => inbox.filter((item) => !item.resolved && !item.ignored).length,
+    [inbox],
   )
 
   const syncLabel =
@@ -756,6 +772,59 @@ export function ControlCenterPage() {
         </div>
       </div>
 
+      <section className="glass-card cc-welcome cc-hero">
+        <div className="cc-hero-content">
+          <h2>Bienvenido de nuevo, @{session?.login ?? 'equipo'}</h2>
+          <p>Tu panel operativo del día: revisa la cola, la cobertura y las alertas sin salir de aquí.</p>
+        </div>
+        <div className="cc-hero-brand" aria-hidden>
+          <div className="cc-hero-orb" />
+          <img src={neuraliveLogotype} alt="" className="cc-hero-logo" />
+        </div>
+      </section>
+
+      <div className="cc-metrics-row">
+        <article className="vision-stat-card">
+          <div className="vision-stat-icon"><ListTodo size={20} strokeWidth={1.6} /></div>
+          <div className="vision-stat-body">
+            <span>En cola hoy</span>
+            <strong>{loading ? '—' : inboxActiveCount}</strong>
+            <em>Ítems pendientes en tu bandeja</em>
+          </div>
+        </article>
+        <article className="vision-stat-card live">
+          <div className="vision-stat-icon"><Radio size={20} strokeWidth={1.6} /></div>
+          <div className="vision-stat-body">
+            <span>En directo</span>
+            <strong>{liveTalents.length}</strong>
+            <em>De {talents.length} talentos monitoreados</em>
+          </div>
+        </article>
+        <article className={`vision-stat-card${alerts.length > 0 ? ' warn' : ' ok'}`}>
+          <div className="vision-stat-icon"><AlertTriangle size={20} strokeWidth={1.6} /></div>
+          <div className="vision-stat-body">
+            <span>Alertas</span>
+            <strong>{alerts.length}</strong>
+            <em>{alerts.length === 0 ? 'Todo en orden' : 'Requieren atención'}</em>
+          </div>
+        </article>
+        <article className={`vision-stat-card${onDuty ? ' ok' : ''}`}>
+          <div className="vision-stat-icon"><UserCheck size={20} strokeWidth={1.6} /></div>
+          <div className="vision-stat-body">
+            <span>Guardia War Room</span>
+            <strong>{onDuty ? 'Tú' : coverage ? `@${coverage.login}` : '—'}</strong>
+            <em>{onDuty ? 'Estás de guardia hoy' : coverage ? 'Cobertura activa' : 'Sin guardia asignada'}</em>
+          </div>
+        </article>
+        <VisionGauge
+          value={averageLiveViewers}
+          max={gaugeMaxViewers}
+          label="Promedio live"
+          displayValue={averageLiveViewers > 0 ? averageLiveViewers.toLocaleString('es-MX') : '—'}
+          suffix="viewers"
+        />
+      </div>
+
       <AssistantTasksSummary tasks={tasks} />
 
       <SectionCard
@@ -792,9 +861,17 @@ export function ControlCenterPage() {
         }
       >
         {loading ? (
-          <p className="empty-state cc-empty">Cargando bandeja…</p>
+          <div className="empty-state-rich cc-empty">
+            <Loader2 size={22} className="ml-spin" aria-hidden />
+            <b>Cargando bandeja del día…</b>
+            <p>Revisando tareas, lives y alertas del equipo.</p>
+          </div>
         ) : visibleInbox.length === 0 ? (
-          <p className="empty-state cc-empty">Nada urgente por ahora. Buen día.</p>
+          <div className="empty-state-rich cc-empty">
+            <CheckCircle2 size={28} strokeWidth={1.5} aria-hidden />
+            <b>Todo al día</b>
+            <p>No hay nada urgente en tu cola. Puedes revisar el War Room o el panel de tareas cuando quieras.</p>
+          </div>
         ) : (
           <ul className="cc-inbox">
             {visibleInbox.map((item) => (

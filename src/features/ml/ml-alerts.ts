@@ -22,7 +22,7 @@ async function ensureNativePermission(): Promise<boolean> {
 export async function postMlDiscordAlert(
   title: string,
   body: string,
-  color = 0x6366f1,
+  color = 0xED34D6,
 ): Promise<boolean> {
   const settings = await getDiscordSettings()
   if (!settings.enabled || !settings.webhookUrl.trim()) return false
@@ -117,7 +117,7 @@ export async function dispatchMlAlerts(input: {
       alertKey('regime', `${c.login}-${c.capturedAt}`),
       `Cambio de régimen · ${c.displayName}`,
       `CUSUM ${c.direction === 'up' ? 'alcista' : 'bajista'} · ${c.viewers.toLocaleString('es-MX')} viewers`,
-      0x6366f1,
+      0xED34D6,
     )
   }
 

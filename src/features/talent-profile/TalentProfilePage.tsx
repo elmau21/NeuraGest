@@ -73,7 +73,7 @@ const PROFILE_TABS: { id: ProfileTab; label: string; icon: typeof Layers }[] = [
   { id: 'clips', label: 'Clips', icon: Film },
 ]
 
-const PIE_COLORS = ['#9146ff', '#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899']
+const PIE_COLORS = ['#9146ff', '#ED34D6', '#470872', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899']
 
 const chartTooltipStyle = {
   backgroundColor: 'var(--popover, #0d1117)',
@@ -535,9 +535,9 @@ export function TalentProfilePage() {
                   <BarChart data={categories.slice(0, 12)} layout="vertical" margin={{ left: 8, right: 16, top: 8, bottom: 4 }}>
                     <CartesianGrid stroke="var(--chart-grid, #1e2530)" horizontal={false} />
                     <XAxis type="number" tick={{ fontSize: 9, fill: '#8b95a7' }} />
-                    <YAxis type="category" dataKey="category" width={120} tick={{ fontSize: 9, fill: '#c4b5fd' }} />
+                    <YAxis type="category" dataKey="category" width={120} tick={{ fontSize: 9, fill: '#f0abfc' }} />
                     <Tooltip contentStyle={chartTooltipStyle} />
-                    <Bar dataKey="avgViewers" name="Avg viewers" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="avgViewers" name="Avg viewers" fill="#ED34D6" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

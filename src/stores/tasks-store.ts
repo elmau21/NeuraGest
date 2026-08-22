@@ -7,6 +7,7 @@ import {
   type TaskRecord,
   type TaskMutationResult,
 } from '@/services/tasks'
+import { toastError } from '@/stores/toast-store'
 
 type TasksState = {
   tasks: TaskRecord[]
@@ -47,8 +48,13 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     if (created) set({ tasks: [...get().tasks, created], selectedId: created.id })
   },
   move: async (id, status) => {
-    set({ tasks: get().tasks.map((task) => task.id === id ? { ...task, status } : task) })
-    await moveTaskStatus(id, status)
+    const previous = get().tasks
+    set({ tasks: get().tasks.map((task) => (task.id === id ? { ...task, status } : task)) })
+    const ok = await moveTaskStatus(id, status)
+    if (!ok) {
+      set({ tasks: previous })
+      toastError('No se pudo mover la tarea.')
+    }
   },
   remove: async (id) => {
     const result = await deleteTask(id)

@@ -5,6 +5,10 @@ import {
 } from '@/components/icons'
 import { PageTransition } from '@/components/PageTransition'
 import { ToastHost } from '@/components/ToastHost'
+import { GlobalSearch } from '@/components/GlobalSearch'
+import { ShortcutsModal } from '@/components/ShortcutsModal'
+import { OfflineBanner } from '@/components/OfflineBanner'
+import { PermissionGate } from '@/components/PermissionGate'
 import { TalentsSkeleton } from '@/components/Skeleton'
 import { toastError, toastSuccess } from '@/stores/toast-store'
 import { Dashboard } from '@/features/dashboard/Dashboard'
@@ -32,6 +36,7 @@ import { TwitchTrackerPanel } from '@/features/settings/TwitchTrackerPanel'
 import { UpdaterPanel } from '@/features/settings/UpdaterPanel'
 import { BackgroundUpdater } from '@/features/settings/BackgroundUpdater'
 import { ManagerTour } from '@/features/onboarding/ManagerTour'
+import { OnboardingModal } from '@/features/onboarding/OnboardingModal'
 import { NativeAlertSettings } from '@/features/settings/NativeAlertSettings'
 import { LiveSoundSettings } from '@/features/settings/LiveSoundSettings'
 import { NavVisibilitySettings } from '@/features/settings/NavVisibilitySettings'
@@ -80,10 +85,12 @@ import {
   canManageAppRoles,
   canMutateCrm,
   defaultPathForRoles,
+  getControlCenterDenial,
+  getDatosDenial,
   isBasicSettingsOnly,
   isNoRoleUser,
 } from '@/services/permissions'
-import { allNavItems, navSections, navTourIds, settingsNav, type NavItem } from '@/services/nav-config'
+import { navSections, navTourIds, settingsNav, type NavItem } from '@/services/nav-config'
 import {
   isNavItemHidden,
   NAV_VISIBILITY_CHANGED,
@@ -329,12 +336,25 @@ function SettingsPage() {
     ) : (
       <>
         <NavVisibilitySettings/>
-        <Card><h3>Monitoreo Twitch</h3><p>Métricas públicas de talentos en tiempo casi real.</p>
-          <div className={`connection helix-connection ${helixStatus}`}><div className={helixStatus === 'connected' ? 'online-dot' : helixStatus === 'error' ? 'offline-dot' : 'pending-dot'}/><div><b>{helixLabel}</b><span>{helixStatus === 'connected' ? `Monitoreo activo${lastTwitchUpdate ? ` · actualizado ${new Date(lastTwitchUpdate).toLocaleTimeString()}` : ''}` : twitchError ?? 'Preparando consulta de métricas públicas'}</span></div><button className="secondary" onClick={() => void refreshTalentData().then(() => {
-            const err = useAppStore.getState().twitchError
-            if (err) toastError('No se pudo sincronizar')
-            else toastSuccess('Sincronizado')
-          })}>Reintentar</button></div>
+        <Card className="settings-panel-card">
+          <div className="settings-panel-head">
+            <div>
+              <h3><Activity size={16} strokeWidth={1.6} /> Monitoreo Twitch</h3>
+              <p>Métricas públicas de talentos en tiempo casi real.</p>
+            </div>
+          </div>
+          <div className={`connection helix-connection ${helixStatus}`}>
+            <div className={helixStatus === 'connected' ? 'online-dot' : helixStatus === 'error' ? 'offline-dot' : 'pending-dot'} />
+            <div>
+              <b>{helixLabel}</b>
+              <span>{helixStatus === 'connected' ? `Monitoreo activo${lastTwitchUpdate ? ` · actualizado ${new Date(lastTwitchUpdate).toLocaleTimeString()}` : ''}` : twitchError ?? 'Preparando consulta de métricas públicas'}</span>
+            </div>
+            <button className="secondary" onClick={() => void refreshTalentData().then(() => {
+              const err = useAppStore.getState().twitchError
+              if (err) toastError('No pudimos actualizar los datos de Twitch. Inténtalo de nuevo.')
+              else toastSuccess('Datos de Twitch actualizados.')
+            })}>Reintentar</button>
+          </div>
         </Card>
         {showSecrets && <TwitchHelixSettings/>}
         <BackfillPanel/>
@@ -355,34 +375,32 @@ function SettingsPage() {
 function CommandPalette() {
   const open = useAppStore((s) => s.commandOpen)
   const setOpen = useAppStore((s) => s.setCommandOpen)
-  const navigate = useNavigate()
-  const roles = useAuthStore((s) => s.roles)
-  const session = useAuthStore((s) => s.session)
-  const login = session?.login
-  const showAudit = canViewAudit(roles)
-  const showControlCenter = canAccessControlCenter(roles, login)
-  const [navPrefs, setNavPrefs] = useState(() => readNavVisibilityPrefs(login))
-  useEffect(() => {
-    setNavPrefs(readNavVisibilityPrefs(login))
-    const onChange = () => setNavPrefs(readNavVisibilityPrefs(login))
-    window.addEventListener(NAV_VISIBILITY_CHANGED, onChange)
-    return () => window.removeEventListener(NAV_VISIBILITY_CHANGED, onChange)
-  }, [login])
-  if (!open) return null
-  const items = allNavItems.filter(([to]) => {
-    if (to === '/ajustes') return false
-    if (isNavItemHidden(navPrefs, to, navSections.find((s) => s.items.some(([p]) => p === to))?.title ?? '')) return false
-    if (to === '/auditoria' && !showAudit) return false
-    if (to === '/control' && !showControlCenter) return false
-    return canAccessPath(roles, to, login)
-  })
-  return <div className="modal-backdrop" onClick={() => setOpen(false)}><div className="command-modal" onClick={(e) => e.stopPropagation()}><div><Search size={19}/><input autoFocus placeholder="Buscar talentos, tareas, documentos…"/><kbd>ESC</kbd></div>{items.map(([to,label,Icon]) => <button key={to} onClick={() => { navigate(to); setOpen(false) }}><Icon size={17} strokeWidth={1.75} absoluteStrokeWidth />{label}<span>Ir a</span></button>)}</div></div>
+  return <GlobalSearch open={open} onClose={() => setOpen(false)} />
+}
+
+function ShortcutsHelp() {
+  const open = useAppStore((s) => s.shortcutsOpen)
+  const setOpen = useAppStore((s) => s.setShortcutsOpen)
+  return <ShortcutsModal open={open} onClose={() => setOpen(false)} />
 }
 
 function RoleRouteGuard() {
   const roles = useAuthStore((s) => s.roles)
   const login = useAuthStore((s) => s.session)?.login
   const location = useLocation()
+  const path = location.pathname
+  const inlinePermissionRoutes = [
+    '/control',
+    '/inteligencia',
+    '/ciencia-datos',
+    '/ml',
+    '/estadisticas',
+    '/analitica',
+    '/auditoria',
+  ]
+  if (inlinePermissionRoutes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {
+    return null
+  }
   if (!canAccessPath(roles, location.pathname, login)) {
     return <Navigate to={defaultPathForRoles(roles, login)} replace />
   }
@@ -391,12 +409,14 @@ function RoleRouteGuard() {
 
 function Shell() {
   const [mobile, setMobile] = useState(false)
+  const [isNarrow, setIsNarrow] = useState(false)
   const [collapsed, setCollapsed] = useState(readSidebarCollapsed)
   const [sectionCollapsed, setSectionCollapsed] = useState<SidebarSectionState>(readSidebarSections)
   const demo = useAppStore((s) => s.demoMode)
   const helixStatus = useAppStore((s) => s.helixStatus)
   const refreshTalentData = useAppStore((s) => s.refreshTalentData)
   const setCommandOpen = useAppStore((s) => s.setCommandOpen)
+  const setShortcutsOpen = useAppStore((s) => s.setShortcutsOpen)
   const session = useAuthStore((s) => s.session)
   const roles = useAuthStore((s) => s.roles)
   const logout = useAuthStore((s) => s.logout)
@@ -432,13 +452,31 @@ function Shell() {
 
   useEffect(() => {
     if (noRole) return
+    const mq = window.matchMedia('(max-width: 1024px)')
+    const update = () => {
+      setIsNarrow(mq.matches)
+      if (!mq.matches) setMobile(false)
+    }
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [noRole])
+
+  useEffect(() => {
+    if (noRole) return
     const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const typing = target?.closest('input, textarea, select, [contenteditable="true"]')
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setCommandOpen(true) }
-      if (e.key === 'Escape') { setCommandOpen(false); setUserMenuOpen(false) }
+      if (!typing && e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault()
+        setShortcutsOpen(true)
+      }
+      if (e.key === 'Escape') { setCommandOpen(false); setShortcutsOpen(false); setUserMenuOpen(false); setMobile(false) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [setCommandOpen, noRole])
+  }, [setCommandOpen, setShortcutsOpen, noRole])
 
   useEffect(() => {
     if (noRole) return
@@ -483,13 +521,22 @@ function Shell() {
   const sidebarLabel = demo ? 'Requiere app de escritorio' : helixStatus === 'connected' ? 'Twitch conectado' : helixStatus === 'error' ? 'Error de conexión Twitch' : 'Conectando con Twitch…'
   const sidebarDot = demo || helixStatus === 'error' ? 'offline-dot' : helixStatus === 'connected' ? 'online-dot' : 'pending-dot'
   const avatarLabel = session?.displayName.slice(0, 2).toUpperCase() ?? 'NL'
-  const shellClass = collapsed ? 'app-shell sidebar-collapsed' : 'app-shell'
-  const asideClass = [mobile ? 'open' : '', collapsed ? 'collapsed' : ''].filter(Boolean).join(' ')
+  const shellClass = [collapsed ? 'app-shell vision-ui sidebar-collapsed' : 'app-shell vision-ui', isNarrow ? 'is-narrow' : ''].filter(Boolean).join(' ')
+  const asideClass = [mobile ? 'open' : '', collapsed && !isNarrow ? 'collapsed' : ''].filter(Boolean).join(' ')
   const renderNavLink = (item: NavItem) => {
     const [to, label, Icon] = item
     const tourId = navTourIds[to]
     return (
-      <NavLink key={to} to={to} end={to === '/' || to === '/diseno' || to === '/neuralleague' || to === '/control'} onClick={() => setMobile(false)} title={collapsed ? label : undefined} data-tour={tourId} className={to === '/control' ? 'nav-control-center' : undefined}>
+      <NavLink
+        key={to}
+        to={to}
+        end={to === '/' || to === '/diseno' || to === '/neuralleague' || to === '/control'}
+        onClick={() => setMobile(false)}
+        title={collapsed ? label : undefined}
+        data-nav-label={label}
+        data-tour={tourId}
+        className={to === '/control' ? 'nav-control-center' : undefined}
+      >
         <Icon className="sidebar-icon" size={16} strokeWidth={1.6} absoluteStrokeWidth />
         <span className="sidebar-link-label">{label}</span>
       </NavLink>
@@ -530,6 +577,7 @@ function Shell() {
               className="sidebar-section-toggle"
               onClick={() => toggleSection(section.title)}
               aria-expanded={!isSectionCollapsed}
+              aria-label={`${section.title} — ${isSectionCollapsed ? 'expandir' : 'colapsar'} sección`}
             >
               <span className="sidebar-section-label">{section.title}</span>
               <ChevronDown
@@ -557,7 +605,7 @@ function Shell() {
       <span>{sidebarLabel}<small>Monitoreo público + caché local</small></span>
     </div>
   </aside>
-    <main><header><button className="mobile-menu" onClick={() => setMobile(true)}><Menu/></button><button className="quick-search" onClick={() => setCommandOpen(true)}><Search size={16}/>Buscar en NeuraGest<kbd>Ctrl K</kbd></button><div className="header-actions"><ActiveUsersBadge/><ActivityInbox/><div className="user-menu-wrap"><button className="user-avatar" onClick={(e) => { e.stopPropagation(); setUserMenuOpen((open) => !open) }} aria-label="Menú de usuario">{session?.avatarUrl ? <img src={session.avatarUrl} alt="" /> : avatarLabel}</button>{userMenuOpen && <div className="user-menu" onClick={(e) => e.stopPropagation()}><div className="user-menu-head"><b>{session?.displayName ?? 'Usuario'}</b><span>@{session?.login ?? 'twitch'}</span></div><button onClick={() => { setUserMenuOpen(false); void logout() }}><LogOut size={15}/>Cerrar sesión</button></div>}</div></div></header><div className="content"><RoleRouteGuard/><PageTransition><Routes location={location}><Route path="/" element={<Dashboard/>}/><Route path="/control" element={showControlCenter ? <ControlCenterPage/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/control/tareas" element={showControlCenter ? <AssistantTasksPage/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/control/fichas" element={showControlCenter ? <EventFichasPage/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/asistente" element={<Navigate to="/control" replace />}/><Route path="/war-room" element={<WarRoomPage/>}/><Route path="/talentos" element={<Talents/>}/><Route path="/talento/:login" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando perfil…</div>}><TalentProfilePage/></Suspense>}/><Route path="/pipeline" element={<PipelinePage/>}/><Route path="/crm" element={<CrmPage/>}/><Route path="/rate-card" element={<RateCardPage/>}/><Route path="/brief" element={<BriefPage/>}/><Route path="/assets" element={<AssetsPage/>}/><Route path="/diseno" element={<CreativeDrivePage/>}/><Route path="/diseno/huecos" element={<ChannelGapsPage/>}/><Route path="/diseno/briefs" element={<CreativeBriefsPage/>}/><Route path="/neuralleague" element={<NeuraLeagueOverviewPage/>}/><Route path="/neuralleague/equipos" element={<NeuraLeagueTeamsPage/>}/><Route path="/neuralleague/jugadores" element={<NeuraLeaguePlayersPage/>}/><Route path="/neuralleague/calendario" element={<NeuraLeagueCalendarPage/>}/><Route path="/neuralleague/stats" element={<NeuraLeagueStatsPage/>}/><Route path="/neuralleague/vods" element={<NeuraLeagueVodsPage/>}/><Route path="/neuralleague/entrenamientos" element={<NeuraLeagueTrainingPage/>}/><Route path="/neuralleague/reclutamiento" element={<NeuraLeagueRecruitmentPage/>}/><Route path="/neuralleague/operacion" element={<NeuraLeagueOperationsPage/>}/><Route path="/handoff" element={<HandoffPage/>}/><Route path="/comisiones" element={<CommissionsPage/>}/><Route path="/portal" element={<PortalPage/>}/><Route path="/portal/:login" element={<PortalPage/>}/><Route path="/media-kit" element={<MediaKitPage/>}/><Route path="/media-kit/comparar" element={<MediaKitComparePage/>}/><Route path="/vod-digest" element={<VodDigestPage/>}/><Route path="/board-pack" element={<BoardPackPage/>}/><Route path="/schedule" element={<ScheduleCompliancePage/>}/><Route path="/onboarding" element={<OnboardingPage/>}/><Route path="/tareas" element={<TasksPage/>}/><Route path="/wiki" element={<WikiPage/>}/><Route path="/documentos" element={<Documents/>}/><Route path="/calendario" element={<CalendarPage/>}/><Route path="/inteligencia" element={canAccessDatosNav(roles, login) ? <TwitchIntelligencePage/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/ciencia-datos" element={canAccessDatosNav(roles, login) ? <Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/ml" element={canAccessDatosNav(roles, login) ? <Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/estadisticas" element={canAccessDatosNav(roles, login) ? <PlatformStatsPage/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/analitica" element={canAccessDatosNav(roles, login) ? <Analytics/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/auditoria" element={showAudit && canAccessDatosNav(roles, login) ? <AuditPage/> : <Navigate to={defaultPathForRoles(roles, login)} replace />}/><Route path="/ajustes" element={<SettingsPage/>}/></Routes></PageTransition></div></main><CommandPalette/><BackgroundUpdater/><ManagerTour/></div>
+    <main><header className="app-header"><button className="mobile-menu" onClick={() => setMobile(true)} aria-label="Abrir menú"><Menu/></button><button className="quick-search" onClick={() => setCommandOpen(true)}><Search size={16}/>Buscar en NeuraGest<kbd>Ctrl K</kbd></button><div className="header-actions"><ActiveUsersBadge/><ActivityInbox/><div className="user-menu-wrap"><div className="header-user-block"><div className="header-user-text"><b>{session?.displayName ?? 'Usuario'}</b><span>@{session?.login ?? 'twitch'}</span></div><button className="user-avatar" onClick={(e) => { e.stopPropagation(); setUserMenuOpen((open) => !open) }} aria-label="Menú de usuario">{session?.avatarUrl ? <img src={session.avatarUrl} alt="" /> : avatarLabel}</button></div>{userMenuOpen && <div className="user-menu" onClick={(e) => e.stopPropagation()}><div className="user-menu-head"><b>{session?.displayName ?? 'Usuario'}</b><span>@{session?.login ?? 'twitch'}</span></div><button onClick={() => { setUserMenuOpen(false); void logout() }}><LogOut size={15}/>Cerrar sesión</button></div>}</div></div></header><OfflineBanner /><div className="content"><RoleRouteGuard/><PageTransition><Routes location={location}><Route path="/" element={<Dashboard/>}/><Route path="/control" element={<PermissionGate allowed={showControlCenter} denial={getControlCenterDenial(roles)}><ControlCenterPage/></PermissionGate>}/><Route path="/control/tareas" element={<PermissionGate allowed={showControlCenter} denial={getControlCenterDenial(roles)}><AssistantTasksPage/></PermissionGate>}/><Route path="/control/fichas" element={<PermissionGate allowed={showControlCenter} denial={getControlCenterDenial(roles)}><EventFichasPage/></PermissionGate>}/><Route path="/asistente" element={<Navigate to="/control" replace />}/><Route path="/war-room" element={<WarRoomPage/>}/><Route path="/talentos" element={<Talents/>}/><Route path="/talento/:login" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando perfil…</div>}><TalentProfilePage/></Suspense>}/><Route path="/pipeline" element={<PipelinePage/>}/><Route path="/crm" element={<CrmPage/>}/><Route path="/rate-card" element={<RateCardPage/>}/><Route path="/brief" element={<BriefPage/>}/><Route path="/assets" element={<AssetsPage/>}/><Route path="/diseno" element={<CreativeDrivePage/>}/><Route path="/diseno/huecos" element={<ChannelGapsPage/>}/><Route path="/diseno/briefs" element={<CreativeBriefsPage/>}/><Route path="/neuralleague" element={<NeuraLeagueOverviewPage/>}/><Route path="/neuralleague/equipos" element={<NeuraLeagueTeamsPage/>}/><Route path="/neuralleague/jugadores" element={<NeuraLeaguePlayersPage/>}/><Route path="/neuralleague/calendario" element={<NeuraLeagueCalendarPage/>}/><Route path="/neuralleague/stats" element={<NeuraLeagueStatsPage/>}/><Route path="/neuralleague/vods" element={<NeuraLeagueVodsPage/>}/><Route path="/neuralleague/entrenamientos" element={<NeuraLeagueTrainingPage/>}/><Route path="/neuralleague/reclutamiento" element={<NeuraLeagueRecruitmentPage/>}/><Route path="/neuralleague/operacion" element={<NeuraLeagueOperationsPage/>}/><Route path="/handoff" element={<HandoffPage/>}/><Route path="/comisiones" element={<CommissionsPage/>}/><Route path="/portal" element={<PortalPage/>}/><Route path="/portal/:login" element={<PortalPage/>}/><Route path="/media-kit" element={<MediaKitPage/>}/><Route path="/media-kit/comparar" element={<MediaKitComparePage/>}/><Route path="/vod-digest" element={<VodDigestPage/>}/><Route path="/board-pack" element={<BoardPackPage/>}/><Route path="/schedule" element={<ScheduleCompliancePage/>}/><Route path="/onboarding" element={<OnboardingPage/>}/><Route path="/tareas" element={<TasksPage/>}/><Route path="/wiki" element={<WikiPage/>}/><Route path="/documentos" element={<Documents/>}/><Route path="/calendario" element={<CalendarPage/>}/><Route path="/inteligencia" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><TwitchIntelligencePage/></PermissionGate>}/><Route path="/ciencia-datos" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense></PermissionGate>}/><Route path="/ml" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense></PermissionGate>}/><Route path="/estadisticas" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><PlatformStatsPage/></PermissionGate>}/><Route path="/analitica" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><Analytics/></PermissionGate>}/><Route path="/auditoria" element={<PermissionGate allowed={showAudit && canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><AuditPage/></PermissionGate>}/><Route path="/ajustes" element={<SettingsPage/>}/></Routes></PageTransition></div></main><CommandPalette/><ShortcutsHelp/><BackgroundUpdater/><OnboardingModal/><ManagerTour/></div>
 }
 
 function AppGate() {

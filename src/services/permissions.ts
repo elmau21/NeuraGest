@@ -252,3 +252,46 @@ export function defaultPathForRoles(roles: AppRole[], login?: string | null): st
   if (roles.includes('dev')) return DEV_DEFAULT_PATH
   return '/'
 }
+
+export type PermissionDenial = {
+  title: string
+  description: string
+  alternatives: { label: string; to: string }[]
+}
+
+export function getContratosDenial(): PermissionDenial {
+  return {
+    title: 'Solo Manager Liga, owner o asistente',
+    description: 'Los contratos contienen información sensible. Puedes seguir usando Directivas, Extras y la wiki.',
+    alternatives: [
+      { label: 'Ver Directivas', to: '/documentos' },
+      { label: 'Ir al War Room', to: '/war-room' },
+    ],
+  }
+}
+
+export function getDatosDenial(roles: AppRole[]): PermissionDenial {
+  const leagueOnly = hasAnyLeagueRole(roles) && !roles.includes('dev')
+  return {
+    title: leagueOnly ? 'Solo owner, dev o asistente' : 'Sin acceso a Datos',
+    description: leagueOnly
+      ? 'La sección Datos (ML, analítica, auditoría) es para el equipo técnico y operaciones.'
+      : 'No tienes permiso para ver inteligencia, ML ni auditoría.',
+    alternatives: [
+      { label: 'Ver resumen', to: '/' },
+      { label: 'War Room', to: '/war-room' },
+    ],
+  }
+}
+
+export function getControlCenterDenial(roles: AppRole[]): PermissionDenial {
+  const leagueOnly = hasAnyLeagueRole(roles)
+  return {
+    title: leagueOnly ? 'Solo owner, manager o asistente' : 'Centro de control restringido',
+    description: 'El centro de control agrupa tareas operativas, fichas de evento e inbox del equipo.',
+    alternatives: [
+      { label: 'Ver tareas generales', to: '/tareas' },
+      { label: 'Ir al resumen', to: '/' },
+    ],
+  }
+}

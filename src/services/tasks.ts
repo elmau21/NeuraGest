@@ -7,6 +7,9 @@ import {
   TASK_STATUS_IDS,
 } from '@/services/org'
 import { logActivity } from '@/services/activity-log'
+import { readCache, writeCache } from '@/services/offline-cache'
+import { useOfflineStore } from '@/stores/offline-store'
+import { notifyTaskAssigned } from '@/services/native-alerts'
 import type { Priority, TaskStatus } from '@/types'
 
 export type TaskAssignee = {
@@ -145,22 +148,40 @@ async function loadAssigneeMap(taskIds: string[]): Promise<Map<string, TaskAssig
 }
 
 export async function fetchTasks(): Promise<TaskRecord[]> {
-  if (!supabase) return []
-  const { data, error } = await supabase
-    .from('tasks')
-    .select(`
-      id,title,description,status_id,priority_id,due_at,starts_at,estimate_minutes,position,
-      category,assigned_by,created_at,updated_at
-    `)
-    .eq('organization_id', DEFAULT_ORG_ID)
-    .is('deleted_at', null)
-    .order('position', { ascending: true })
-  if (error || !data) return []
-  const assigneeByTask = await loadAssigneeMap(data.map((row) => row.id))
-  const userLabels = await loadUserLabels(
-    data.map((row) => row.assigned_by).filter((id): id is string => Boolean(id)),
-  )
-  return data.map((row) => mapTask(row as Record<string, unknown>, assigneeByTask, userLabels))
+  const setCacheMode = useOfflineStore.getState().setUsingCache
+  if (!supabase) {
+    const cached = readCache<TaskRecord[]>('tasks')
+    setCacheMode(Boolean(cached?.length))
+    return cached ?? []
+  }
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select(`
+        id,title,description,status_id,priority_id,due_at,starts_at,estimate_minutes,position,
+        category,assigned_by,created_at,updated_at
+      `)
+      .eq('organization_id', DEFAULT_ORG_ID)
+      .is('deleted_at', null)
+      .order('position', { ascending: true })
+    if (error || !data) {
+      const cached = readCache<TaskRecord[]>('tasks')
+      setCacheMode(Boolean(cached?.length))
+      return cached ?? []
+    }
+    const assigneeByTask = await loadAssigneeMap(data.map((row) => row.id))
+    const userLabels = await loadUserLabels(
+      data.map((row) => row.assigned_by).filter((id): id is string => Boolean(id)),
+    )
+    const mapped = data.map((row) => mapTask(row as Record<string, unknown>, assigneeByTask, userLabels))
+    writeCache('tasks', mapped)
+    setCacheMode(false)
+    return mapped
+  } catch {
+    const cached = readCache<TaskRecord[]>('tasks')
+    setCacheMode(Boolean(cached?.length))
+    return cached ?? []
+  }
 }
 
 export async function createTask(input: Partial<TaskRecord>): Promise<TaskRecord | null> {
@@ -386,12 +407,19 @@ export async function setTaskAssignees(
     )
     if (insertError) return false
   }
+  const { data: taskRow } = await supabase.from('tasks').select('title').eq('id', taskId).maybeSingle()
+  const title = taskRow?.title?.trim() || undefined
   await logActivity(
     'task',
     'reassigned',
-    { taskId, assignees: list.map((a) => a.label), count: list.length },
+    { title, taskId, assignees: list.map((a) => a.label), count: list.length },
     taskId,
   )
+  const { data: auth } = await supabase.auth.getUser()
+  const currentUserId = auth.user?.id
+  if (currentUserId && list.some((a) => a.userId === currentUserId)) {
+    void notifyTaskAssigned(title ?? 'Tarea', list.find((a) => a.userId === currentUserId)?.label)
+  }
   return true
 }
 

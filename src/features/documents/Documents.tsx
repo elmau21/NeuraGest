@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { FileText, FolderOpen } from '@/components/icons'
 import { DocumentDrive, documentDriveFileCount } from '@/features/documents/DocumentDrive'
 import { WikiPage } from '@/features/wiki/WikiPage'
@@ -6,11 +7,28 @@ import { canAccessContratos } from '@/services/permissions'
 import { useAuthStore } from '@/stores/auth-store'
 
 export function Documents() {
-  const [tab, setTab] = useState<'drive' | 'wiki'>('drive')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const pageParam = searchParams.get('page')
+  const tabParam = searchParams.get('tab')
+  const [tab, setTab] = useState<'drive' | 'wiki'>(() => (
+    tabParam === 'wiki' || pageParam ? 'wiki' : 'drive'
+  ))
   const roles = useAuthStore((s) => s.roles)
   const session = useAuthStore((s) => s.session)
   const canSeeContracts = canAccessContratos(roles, session?.login)
   const fileCount = documentDriveFileCount(canSeeContracts)
+
+  useEffect(() => {
+    if (tabParam === 'wiki' || pageParam) setTab('wiki')
+  }, [tabParam, pageParam])
+
+  const clearDeepLink = () => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('doc')
+    next.delete('folder')
+    next.delete('category')
+    setSearchParams(next, { replace: true })
+  }
 
   return <>
     <div className="page-title">
@@ -27,6 +45,15 @@ export function Documents() {
         <FileText size={15} />Wiki y guías
       </button>
     </div>
-    {tab === 'wiki' ? <WikiPage /> : <DocumentDrive />}
+    {tab === 'wiki' ? (
+      <WikiPage pageId={pageParam} onPageHandled={clearDeepLink} />
+    ) : (
+      <DocumentDrive
+        deepDoc={searchParams.get('doc')}
+        deepFolder={searchParams.get('folder')}
+        deepCategory={searchParams.get('category')}
+        onDeepLinkHandled={clearDeepLink}
+      />
+    )}
   </>
 }

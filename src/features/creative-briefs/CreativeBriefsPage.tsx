@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   CalendarDays,
   Check,
@@ -27,6 +27,7 @@ import { toastError, toastSuccess } from '@/stores/toast-store'
 
 export function CreativeBriefsPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const roles = useAuthStore((s) => s.roles)
   const session = useAuthStore((s) => s.session)
   const readonly = !canMutateDesign(roles, session?.login)
@@ -73,6 +74,16 @@ export function CreativeBriefsPage() {
   useEffect(() => {
     void reload()
   }, [reload])
+
+  useEffect(() => {
+    const briefId = searchParams.get('brief')
+    if (!briefId || briefs.length === 0) return
+    const match = briefs.find((brief) => brief.id === briefId)
+    if (match) {
+      setSelected(match)
+      setSearchParams({}, { replace: true })
+    }
+  }, [briefs, searchParams, setSearchParams])
 
   const generateFromEvent = async (eventId: string) => {
     if (readonly) return

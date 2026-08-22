@@ -80,13 +80,23 @@ function TalentAvatar({ talent }: { talent: Talent }) {
     : <span className="avatar-placeholder">{talent.displayName.slice(0, 2).toUpperCase()}</span>
 }
 
-function MetricCard({ label, value, detail, icon: Icon }: {
+function MetricCard({ label, value, detail, icon: Icon, tone = '' }: {
   label: string
   value: string
   detail: string
   icon: typeof Eye
+  tone?: string
 }) {
-  return <article className="an-metric"><div><span>{label}</span><Icon size={14} /></div><strong>{value}</strong><small>{detail}</small></article>
+  return (
+    <article className={`bi-kpi ${tone}`}>
+      <div className="bi-kpi-icon"><Icon size={18} strokeWidth={1.8} /></div>
+      <div className="bi-kpi-content">
+        <span className="bi-kpi-label">{label}</span>
+        <strong>{value}</strong>
+        <small>{detail}</small>
+      </div>
+    </article>
+  )
 }
 
 export function Analytics() {
@@ -256,18 +266,18 @@ export function Analytics() {
     </section>
 
     {tab === 'summary' && <div className="an-tab-content">
-      <section className="an-metrics">
-        <MetricCard label="En directo" value={`${liveTalents.length}/${talents.length}`} detail={`${talents.length - liveTalents.length} offline`} icon={Radio} />
-        <MetricCard label="Audiencia live" value={analyticsNumber.format(totalLiveViewers)} detail="Viewers simultáneos" icon={Eye} />
-        <MetricCard label="Followers" value={analyticsNumber.format(totalFollowers)} detail="Suma actual de cartera" icon={Users} />
-        <MetricCard label="Líder actual" value={leader?.displayName ?? 'Sin live'} detail={leader ? `${analyticsNumber.format(leader.viewers)} viewers` : 'Sin emisiones activas'} icon={Trophy} />
+      <section className="bi-kpi-strip an-metrics">
+        <MetricCard tone="live" label="En directo" value={`${liveTalents.length}/${talents.length}`} detail={`${talents.length - liveTalents.length} offline`} icon={Radio} />
+        <MetricCard tone="purple" label="Audiencia live" value={analyticsNumber.format(totalLiveViewers)} detail="Viewers simultáneos" icon={Eye} />
+        <MetricCard tone="blue" label="Followers" value={analyticsNumber.format(totalFollowers)} detail="Suma actual de cartera" icon={Users} />
+        <MetricCard tone="amber" label="Líder actual" value={leader?.displayName ?? 'Sin live'} detail={leader ? `${analyticsNumber.format(leader.viewers)} viewers` : 'Sin emisiones activas'} icon={Trophy} />
       </section>
 
       <div className="an-grid an-summary-grid">
         <section className="an-panel">
           <header><div><h2>Distribución de audiencia</h2><p>Share de viewers entre canales en directo</p></div><span>LIVE ONLY</span></header>
           {totalLiveViewers > 0 ? <div className="an-donut-wrap">
-            <ResponsiveContainer width="55%" height={250}><PieChart><Pie data={audienceData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={92} paddingAngle={2}>{audienceData.map((entry, index) => <Cell key={entry.name} fill={['#8b5cf6', '#3b82f6', '#22c55e', '#06b6d4', '#f59e0b', '#ec4899'][index % 6]} />)}</Pie><Tooltip contentStyle={chartTooltipStyle} formatter={(value) => [`${analyticsNumber.format(Number(value))} viewers`, 'Audiencia']} /></PieChart></ResponsiveContainer>
+            <ResponsiveContainer width="55%" height={250}><PieChart><Pie data={audienceData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={92} paddingAngle={2}>{audienceData.map((entry, index) => <Cell key={entry.name} fill={['#ED34D6', '#470872', '#22c55e', '#06b6d4', '#f59e0b', '#ec4899'][index % 6]} />)}</Pie><Tooltip contentStyle={chartTooltipStyle} formatter={(value) => [`${analyticsNumber.format(Number(value))} viewers`, 'Audiencia']} /></PieChart></ResponsiveContainer>
             <div className="an-share-list">{liveTalents.sort((a, b) => b.viewers - a.viewers).map((talent) => <div key={talent.id}><span>{talent.displayName}</span><strong>{viewerShare(talent, totalLiveViewers).toFixed(1)}%</strong></div>)}</div>
           </div> : <div className="an-empty">No hay audiencia live en la captura actual.</div>}
         </section>
@@ -300,7 +310,7 @@ export function Analytics() {
       {selected.length >= 2 ? <div className="an-grid an-compare-grid">
         <section className="an-panel">
           <header><div><h2>Viewers comparados</h2><p>Audiencia simultánea por selección</p></div></header>
-          <div className="an-compare-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={selected} layout="vertical" margin={{ left: 8, right: 25 }}><CartesianGrid stroke="var(--chart-grid)" horizontal={false} /><XAxis type="number" tick={{ fill: '#E5E7EB', fontSize: 10 }} allowDecimals={false} /><YAxis type="category" dataKey="displayName" width={85} tick={{ fill: '#E5E7EB', fontSize: 10 }} /><Tooltip contentStyle={chartTooltipStyle} /><Bar dataKey="viewers" name="Viewers" fill="#8b5cf6" radius={[0, 3, 3, 0]} /></BarChart></ResponsiveContainer></div>
+          <div className="an-compare-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={selected} layout="vertical" margin={{ left: 8, right: 25 }}><CartesianGrid stroke="var(--chart-grid)" horizontal={false} /><XAxis type="number" tick={{ fill: '#E5E7EB', fontSize: 10 }} allowDecimals={false} /><YAxis type="category" dataKey="displayName" width={85} tick={{ fill: '#E5E7EB', fontSize: 10 }} /><Tooltip contentStyle={chartTooltipStyle} /><Bar dataKey="viewers" name="Viewers" fill="#ED34D6" radius={[0, 3, 3, 0]} /></BarChart></ResponsiveContainer></div>
         </section>
         <section className="an-panel an-compare-table"><header><div><h2>Detalle comparativo</h2><p>Métricas y estado actual</p></div></header><div className="an-table-scroll"><table><thead><tr><th>Talento</th><th>Estado</th><th>Categoría</th><th>Viewers</th><th>Followers</th><th>Share</th></tr></thead><tbody>{selected.map((talent) => <tr key={talent.id}><td>{talent.displayName}</td><td><span className={`an-status ${talent.isLive ? 'live' : ''}`}>{talent.isLive ? 'Live' : 'Offline'}</span></td><td>{talent.category || '—'}</td><td>{analyticsNumber.format(talent.viewers)}</td><td>{analyticsNumber.format(talent.followers)}</td><td>{viewerShare(talent, totalLiveViewers).toFixed(1)}%</td></tr>)}</tbody></table></div></section>
       </div> : <div className="an-empty an-selection-empty">Selecciona al menos 2 talentos para activar la comparación.</div>}

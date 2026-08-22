@@ -91,7 +91,7 @@ function pitchHtml(input: PitchExportInput): string {
   h1{margin:0 0 4px;font-size:28px} .sub{color:#9ca3af;font-size:14px;margin-bottom:24px}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th,td{padding:10px 12px;border-bottom:1px solid #2b2b34;text-align:left}
-  th{color:#a78bfa;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  th{color:#f472e8;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
   .meta{display:flex;gap:24px;margin-bottom:20px;font-size:13px;color:#d4d4d8}
   footer{margin-top:28px;font-size:11px;color:#6b7280}
 </style></head><body><div class="wrap">

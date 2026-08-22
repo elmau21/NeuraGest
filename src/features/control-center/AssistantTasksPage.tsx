@@ -16,8 +16,11 @@ import {
   ArrowLeft,
   CalendarDays,
   Check,
+  ArrowUpDown,
+  Clock,
   LayoutGrid,
   List,
+  ListTodo,
   MessageSquare,
   Plus,
   UserRound,
@@ -54,6 +57,8 @@ import { useAuthStore } from '@/stores/auth-store'
 import { toastError, toastSuccess } from '@/stores/toast-store'
 import { isTauri } from '@/services/twitch'
 import type { Priority, TaskStatus } from '@/types'
+import { EmptyState } from '@/components/EmptyState'
+import { RowActionMenu } from '@/components/RowActionMenu'
 
 export type AssigneeOption = { userId: string; label: string }
 
@@ -66,11 +71,11 @@ function assigneeOptionsFromAppUsers(users: AppUserRecord[]): AssigneeOption[] {
     }))
 }
 
-const STATUS_COLUMNS: { id: TaskStatus; title: string }[] = [
-  { id: 'backlog', title: 'Pendiente' },
-  { id: 'progress', title: 'En progreso' },
-  { id: 'review', title: 'En revisión' },
-  { id: 'done', title: 'Completada' },
+const STATUS_COLUMNS: { id: TaskStatus; title: string; hint: string }[] = [
+  { id: 'backlog', title: 'Pendiente', hint: 'Por empezar' },
+  { id: 'progress', title: 'En progreso', hint: 'En curso' },
+  { id: 'review', title: 'En revisión', hint: 'Esperando visto bueno' },
+  { id: 'done', title: 'Completada', hint: 'Lista' },
 ]
 
 const TIME_FILTERS: { id: TaskTimeFilter; label: string }[] = [
@@ -90,11 +95,34 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('es-MX')
 }
 
-function SummaryCard({ label, value, tone }: { label: string; value: number; tone?: string }) {
+const STAT_ICONS = {
+  pending: ListTodo,
+  overdue: Clock,
+  dueSoon: CalendarDays,
+  completed: Check,
+} as const
+
+function SummaryCard({
+  label,
+  value,
+  tone,
+  statKey,
+}: {
+  label: string
+  value: number
+  tone?: string
+  statKey: keyof typeof STAT_ICONS
+}) {
+  const Icon = STAT_ICONS[statKey]
   return (
     <div className={`at-stat ${tone ?? ''}`.trim()}>
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <div className="at-stat-icon" aria-hidden>
+        <Icon size={18} strokeWidth={1.6} />
+      </div>
+      <div className="at-stat-content">
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </div>
     </div>
   )
 }
@@ -187,6 +215,7 @@ function TaskQuickCard({
   onDone,
   onAssign,
   onComment,
+  onMoveStatus,
 }: {
   task: TaskRecord
   readonly: boolean
@@ -201,6 +230,7 @@ function TaskQuickCard({
   onDone: () => void
   onAssign: (userIds: string[]) => void
   onComment: (body: string) => void
+  onMoveStatus?: (status: TaskStatus) => void
 }) {
   const [commentOpen, setCommentOpen] = useState(false)
   const [commentDraft, setCommentDraft] = useState('')
@@ -240,6 +270,22 @@ function TaskQuickCard({
       </button>
       {!readonly && !overlay ? (
         <div className="at-task-actions" onPointerDown={stopDrag}>
+          <RowActionMenu
+            actions={[
+              { id: 'view', label: 'Ver', onClick: onOpen },
+              { id: 'assign', label: 'Asignar', onClick: () => setAssignOpen(true) },
+              ...STATUS_COLUMNS
+                .filter((column) => column.id !== task.status)
+                .map((column) => ({
+                  id: `status-${column.id}`,
+                  label: `Mover a ${column.title}`,
+                  onClick: () => onMoveStatus?.(column.id),
+                })),
+              ...(task.status !== 'done'
+                ? [{ id: 'done', label: 'Marcar hecha', onClick: onDone }]
+                : []),
+            ]}
+          />
           {task.status !== 'done' ? (
             <button type="button" className="at-action-btn" onClick={onDone} title="Marcar hecha">
               <Check size={13} /> Hecha
@@ -299,6 +345,7 @@ function DraggableTaskCard({
   onDone,
   onAssign,
   onComment,
+  onMoveStatus,
 }: {
   task: TaskRecord
   readonly: boolean
@@ -307,6 +354,7 @@ function DraggableTaskCard({
   onDone: () => void
   onAssign: (userIds: string[]) => void
   onComment: (body: string) => void
+  onMoveStatus: (status: TaskStatus) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -330,6 +378,7 @@ function DraggableTaskCard({
       onDone={onDone}
       onAssign={onAssign}
       onComment={onComment}
+      onMoveStatus={onMoveStatus}
     />
   )
 }
@@ -337,6 +386,7 @@ function DraggableTaskCard({
 function KanbanColumn({
   id,
   title,
+  hint,
   tasks,
   readonly,
   users,
@@ -344,9 +394,11 @@ function KanbanColumn({
   onDone,
   onAssign,
   onComment,
+  onMoveStatus,
 }: {
   id: TaskStatus
   title: string
+  hint: string
   tasks: TaskRecord[]
   readonly: boolean
   users: AssigneeOption[]
@@ -354,11 +406,18 @@ function KanbanColumn({
   onDone: (id: string) => void
   onAssign: (taskId: string, userIds: string[]) => void
   onComment: (taskId: string, body: string) => void
+  onMoveStatus: (taskId: string, status: TaskStatus) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id })
   return (
     <section className="at-kanban-col" data-column={id}>
-      <header><span>{title}</span><b>{tasks.length}</b></header>
+      <header>
+        <span>
+          {title}
+          <small className="at-col-hint">{hint}</small>
+        </span>
+        <b>{tasks.length}</b>
+      </header>
       <div ref={setNodeRef} className={`at-kanban-body ${isOver ? 'is-over' : ''}`}>
         {tasks.map((task) => (
           <DraggableTaskCard
@@ -370,10 +429,13 @@ function KanbanColumn({
             onDone={() => onDone(task.id)}
             onAssign={(userIds) => onAssign(task.id, userIds)}
             onComment={(body) => onComment(task.id, body)}
+            onMoveStatus={(status) => onMoveStatus(task.id, status)}
           />
         ))}
         {tasks.length === 0 ? (
-          <p className="at-empty-col">Nada aquí por ahora.</p>
+          <p className="at-empty-col">
+            {readonly ? 'Sin tareas aquí.' : 'Arrastra una tarea aquí o crea una nueva.'}
+          </p>
         ) : null}
       </div>
     </section>
@@ -434,6 +496,7 @@ function AssistantKanban({
             key={col.id}
             id={col.id}
             title={col.title}
+            hint={col.hint}
             tasks={tasks.filter((t) => t.status === col.id)}
             readonly={readonly}
             users={users}
@@ -441,6 +504,7 @@ function AssistantKanban({
             onDone={onDone}
             onAssign={onAssign}
             onComment={onComment}
+            onMoveStatus={onMove}
           />
         ))}
       </div>
@@ -698,7 +762,7 @@ export function AssistantTasksPage() {
     <div className="assistant-tasks">
       <div className="page-title">
         <div>
-          <Link to="/control" className="at-back"><ArrowLeft size={14} /> Centro de control</Link>
+          <Link to="/control" className="page-breadcrumb at-back"><ArrowLeft size={14} /> Centro de control</Link>
           <h1>Panel de tareas</h1>
           <p>Todo lo que necesitas hacer hoy, en un solo lugar — sin tecnicismos.</p>
         </div>
@@ -710,13 +774,13 @@ export function AssistantTasksPage() {
       </div>
 
       <div className="at-summary">
-        <SummaryCard label="Pendientes" value={counts.pending} />
-        <SummaryCard label="Atrasadas" value={counts.overdue} tone="warn" />
-        <SummaryCard label="Vencen pronto" value={counts.dueSoon} tone="soon" />
-        <SummaryCard label="Completadas recientes" value={counts.completedRecent} tone="ok" />
+        <SummaryCard label="Pendientes" value={counts.pending} statKey="pending" />
+        <SummaryCard label="Atrasadas" value={counts.overdue} tone="warn" statKey="overdue" />
+        <SummaryCard label="Vencen pronto" value={counts.dueSoon} tone="soon" statKey="dueSoon" />
+        <SummaryCard label="Completadas recientes" value={counts.completedRecent} tone="ok" statKey="completed" />
       </div>
 
-      <div className="at-toolbar card">
+      <div className="at-toolbar glass-card">
         <div className="at-chips">
           {TIME_FILTERS.map((chip) => (
             <button
@@ -740,9 +804,28 @@ export function AssistantTasksPage() {
       </div>
 
       {loading ? (
-        <p className="empty-state">Cargando tareas…</p>
+        <p className="empty-state is-loading">Cargando tareas…</p>
+      ) : tasks.length === 0 ? (
+        <EmptyState
+          icon={ListTodo}
+          title="Aún no hay tareas"
+          description="Crea la primera para organizar tu día y el del equipo."
+        >
+          {!readonly ? (
+            <button type="button" className="primary" onClick={() => setCreateOpen(true)}>
+              <Plus size={16} /> Crear tarea
+            </button>
+          ) : null}
+        </EmptyState>
       ) : view === 'kanban' ? (
-        <AssistantKanban
+        <>
+          {!readonly ? (
+            <p className="at-drag-hint" role="note">
+              <ArrowUpDown size={14} strokeWidth={1.6} />
+              Arrastra las tarjetas entre columnas para cambiar su estado.
+            </p>
+          ) : null}
+          <AssistantKanban
           tasks={boardTasks}
           readonly={readonly}
           users={assigneeOptions}
@@ -752,10 +835,20 @@ export function AssistantTasksPage() {
           onComment={(taskId, body) => void handleComment(taskId, body)}
           onMove={(taskId, status) => void moveStatus(taskId, status)}
         />
+        </>
       ) : (
         <div className="card at-list">
           {listTasks.length === 0 ? (
-            <p className="empty-state">No hay tareas con este filtro. ¡Buen trabajo!</p>
+            <EmptyState
+              title="No hay tareas con este filtro"
+              description="Prueba otro filtro o crea una tarea nueva."
+            >
+              {!readonly ? (
+                <button type="button" className="primary" onClick={() => setCreateOpen(true)}>
+                  <Plus size={16} /> Crear tarea
+                </button>
+              ) : null}
+            </EmptyState>
           ) : (
             listTasks.map((task) => (
               <TaskQuickCard
@@ -767,6 +860,7 @@ export function AssistantTasksPage() {
                 onDone={() => void markDone(task.id)}
                 onAssign={(userIds) => void handleAssign(task.id, userIds)}
                 onComment={(body) => void handleComment(task.id, body)}
+                onMoveStatus={(status) => void moveStatus(task.id, status)}
               />
             ))
           )}

@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Bell, X } from '@/components/icons'
 import { fetchActivity, watchActivity, type ActivityItem } from '@/services/activity'
+import { isActivityNavigable, resolveActivityNavigation } from '@/services/activity-navigation'
+import { canAccessControlCenter, canAccessDatosNav, canManageAppRoles } from '@/services/permissions'
+import { useAuthStore } from '@/stores/auth-store'
+import { toastInfo } from '@/stores/toast-store'
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -16,6 +21,15 @@ export function ActivityInbox() {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<ActivityItem[]>([])
   const wrapRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
+  const roles = useAuthStore((s) => s.roles)
+  const login = useAuthStore((s) => s.session)?.login
+
+  const navCtx = {
+    canAccessControlCenter: canAccessControlCenter(roles, login),
+    canAccessDatos: canAccessDatosNav(roles, login),
+    canManageRoles: canManageAppRoles(roles, login),
+  }
 
   const load = () => void fetchActivity().then(setItems)
 
@@ -32,6 +46,16 @@ export function ActivityInbox() {
     window.addEventListener('click', close)
     return () => window.removeEventListener('click', close)
   }, [open])
+
+  const handleItemClick = (item: ActivityItem) => {
+    const target = resolveActivityNavigation(item, navCtx)
+    if (!target) {
+      toastInfo('Esta notificación no tiene un destino disponible.')
+      return
+    }
+    setOpen(false)
+    navigate(target.to)
+  }
 
   const unread = items.length > 0
 
@@ -57,17 +81,36 @@ export function ActivityInbox() {
             <button className="secondary" onClick={() => setOpen(false)}><X size={14}/></button>
           </div>
           <div className="activity-list">
-            {items.map((item) => (
-              <div key={item.id} className="activity-row">
-                <span>{relativeTime(item.createdAt)}</span>
-                <p>{item.label}</p>
-                <small>
-                  {item.actorLogin
-                    ? `@${item.actorLogin}`
-                    : item.actorName ?? item.entityType}
-                </small>
-              </div>
-            ))}
+            {items.map((item) => {
+              const clickable = isActivityNavigable(item, navCtx)
+              return (
+                <div
+                  key={item.id}
+                  className={`activity-row${clickable ? ' activity-row-clickable' : ' activity-row-static'}`}
+                  role={clickable ? 'button' : undefined}
+                  tabIndex={clickable ? 0 : undefined}
+                  onClick={clickable ? () => handleItemClick(item) : undefined}
+                  onKeyDown={
+                    clickable
+                      ? (event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            handleItemClick(item)
+                          }
+                        }
+                      : undefined
+                  }
+                >
+                  <span>{relativeTime(item.createdAt)}</span>
+                  <p>{item.label}</p>
+                  <small>
+                    {item.actorLogin
+                      ? `@${item.actorLogin}`
+                      : item.actorName ?? item.entityType}
+                  </small>
+                </div>
+              )
+            })}
             {items.length === 0 && <p className="empty-state">Sin actividad reciente.</p>}
           </div>
         </div>

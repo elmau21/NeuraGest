@@ -92,7 +92,7 @@ export function WeeklyComparePanel({
                   <YAxis tick={{ fill: '#E5E7EB', fontSize: 10 }} allowDecimals={false} />
                   <Tooltip contentStyle={chartTooltipStyle} />
                   <Bar dataKey="anterior" name="Sem. anterior" fill="#536078" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="actual" name="Sem. actual" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="actual" name="Sem. actual" fill="#ED34D6" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

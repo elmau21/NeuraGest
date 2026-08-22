@@ -104,4 +104,15 @@ export async function testNativeNotification(): Promise<boolean> {
   }
 }
 
+/** Notificación cuando te asignan una tarea (in-app vía sistema operativo). */
+export async function notifyTaskAssigned(taskTitle: string, assigneeLabel?: string): Promise<void> {
+  if (!isTauri) return
+  const settings = await getNativeAlertSettings()
+  if (!settings.enabled) return
+  await pushNotification(
+    'Nueva tarea asignada',
+    assigneeLabel ? `«${taskTitle}» — ${assigneeLabel}` : `«${taskTitle}»`,
+  )
+}
+
 export type { NativeAlertSettings }

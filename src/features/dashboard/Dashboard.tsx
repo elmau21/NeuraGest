@@ -25,9 +25,11 @@ import { useAppStore } from '@/stores/app-store'
 import { useMetricHistory } from '@/hooks/useMetricHistory'
 import type { Talent } from '@/types'
 import { MetricHistoryChart } from './MetricHistoryChart'
+import { VisionGauge } from '@/components/VisionGauge'
 import { ActiveUsersPanel } from '@/features/presence/ActiveUsersPanel'
 import { DashboardSkeleton } from '@/components/Skeleton'
 import { toastError, toastSuccess } from '@/stores/toast-store'
+import { MyDaySection } from './MyDaySection'
 
 type StatusFilter = 'all' | 'live' | 'offline'
 type SortKey = 'viewers' | 'name' | 'followers'
@@ -79,6 +81,7 @@ export function Dashboard() {
   const liveTalents = filtered.filter((talent) => talent.isLive)
   const totalViewers = liveTalents.reduce((sum, talent) => sum + talent.viewers, 0)
   const averageViewers = liveTalents.length ? Math.round(totalViewers / liveTalents.length) : 0
+  const gaugeMaxViewers = Math.max(100, ...talents.map((t) => t.viewers), averageViewers)
   const chartData = filtered.map((talent) => ({
     name: talent.displayName,
     viewers: talent.viewers,
@@ -120,6 +123,8 @@ export function Dashboard() {
 
       <ActiveUsersPanel />
 
+      <MyDaySection />
+
       <section className="bi-filterbar" aria-label="Filtros globales">
         <label className="bi-search">
           <Search size={15} />
@@ -154,9 +159,12 @@ export function Dashboard() {
       <section className="bi-kpi-strip">
         {kpis.map(({ label, value, meta, icon: Icon, tone }) => (
           <div className={`bi-kpi ${tone}`} key={label}>
-            <div className="bi-kpi-label"><span>{label}</span><Icon size={14} /></div>
-            <strong>{value}</strong>
-            <small>{meta}</small>
+            <div className="bi-kpi-icon"><Icon size={18} strokeWidth={1.8} /></div>
+            <div className="bi-kpi-content">
+              <span className="bi-kpi-label">{label}</span>
+              <strong>{value}</strong>
+              <small>{meta}</small>
+            </div>
           </div>
         ))}
       </section>
@@ -170,6 +178,19 @@ export function Dashboard() {
           <div className="bi-chart">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 10, right: 12, left: 0, bottom: 8 }}>
+                <defs>
+                  <linearGradient id="biBarLive" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#4ade80" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#4ade80" stopOpacity={0.05} />
+                  </linearGradient>
+                  <linearGradient id="biBarOffline" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#64748b" stopOpacity={0.9} />
+                    <stop offset="100%" stopColor="#64748b" stopOpacity={0.05} />
+                  </linearGradient>
+                  <filter id="biBarGlow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#22c55e" floodOpacity="0.45" />
+                  </filter>
+                </defs>
                 <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
                 <XAxis
                   dataKey="name"
@@ -201,8 +222,14 @@ export function Dashboard() {
                   labelStyle={{ color: 'var(--popover-foreground)', fontWeight: 600 }}
                   itemStyle={{ color: 'var(--popover-foreground)' }}
                 />
-                <Bar dataKey="viewers" name="Viewers" fill="var(--chart-offline)" radius={[3, 3, 0, 0]} maxBarSize={46}>
-                  {chartData.map((entry) => <Cell key={entry.name} fill={entry.live ? '#22c55e' : '#536078'} />)}
+                <Bar dataKey="viewers" name="Viewers" radius={[6, 6, 0, 0]} maxBarSize={46}>
+                  {chartData.map((entry) => (
+                    <Cell
+                      key={entry.name}
+                      fill={entry.live ? 'url(#biBarLive)' : 'url(#biBarOffline)'}
+                      filter={entry.live ? 'url(#biBarGlow)' : undefined}
+                    />
+                  ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -210,7 +237,15 @@ export function Dashboard() {
           <footer><span><i className="legend-live" /> En directo</span><span><i className="legend-offline" /> Offline</span></footer>
         </section>
 
-        <section className="bi-panel bi-live-panel">
+        <VisionGauge
+          value={averageViewers}
+          max={gaugeMaxViewers}
+          label="Promedio live"
+          displayValue={averageViewers > 0 ? number.format(averageViewers) : '—'}
+          suffix="viewers"
+        />
+
+        <section className="bi-panel bi-live-panel glow-live">
           <header>
             <div><h2>En directo</h2><p>Detalle de emisiones activas</p></div>
             <Radio size={17} />

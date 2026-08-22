@@ -34,6 +34,31 @@ type ActivityLogRow = {
 const ACTIVITY_SELECT =
   'id,entity_type,entity_id,action,metadata,created_at,actor_id,actor:users!activity_logs_actor_id_fkey(display_name)'
 
+async function enrichTaskTitles(rows: ActivityLogRow[]): Promise<Map<string, string>> {
+  const titles = new Map<string, string>()
+  if (!supabase) return titles
+
+  const taskIds = [
+    ...new Set(
+      rows
+        .filter((row) => row.entity_type === 'task' && row.entity_id)
+        .filter((row) => {
+          const metaTitle = row.metadata?.title
+          return !(typeof metaTitle === 'string' && metaTitle.trim())
+        })
+        .map((row) => row.entity_id as string),
+    ),
+  ]
+  if (taskIds.length === 0) return titles
+
+  const { data } = await supabase.from('tasks').select('id,title').in('id', taskIds)
+  for (const row of data ?? []) {
+    const taskTitle = row.title?.trim()
+    if (taskTitle) titles.set(row.id, taskTitle)
+  }
+  return titles
+}
+
 async function enrichActorsFromDirectory(
   rows: ActivityLogRow[],
 ): Promise<Map<string, ActivityActor>> {
@@ -62,9 +87,18 @@ async function enrichActorsFromDirectory(
 export function mapActivityRows(
   rows: ActivityLogRow[],
   actorDirectory?: Map<string, ActivityActor>,
+  taskTitles?: Map<string, string>,
 ): ActivityItem[] {
   return rows.map((row) => {
-    const metadata = (row.metadata ?? {}) as Record<string, unknown>
+    const metadata = { ...(row.metadata ?? {}) } as Record<string, unknown>
+    if (
+      row.entity_type === 'task' &&
+      row.entity_id &&
+      !(typeof metadata.title === 'string' && metadata.title.trim())
+    ) {
+      const resolvedTitle = taskTitles?.get(row.entity_id)
+      if (resolvedTitle) metadata.title = resolvedTitle
+    }
     const fromDirectory = row.actor_id ? actorDirectory?.get(row.actor_id) : undefined
     const actor = fromDirectory ?? row.actor
     const actorName = resolveActorName(actor, metadata)
@@ -84,8 +118,11 @@ export function mapActivityRows(
 }
 
 async function loadActivityRows(rows: ActivityLogRow[]): Promise<ActivityItem[]> {
-  const directory = await enrichActorsFromDirectory(rows)
-  return mapActivityRows(rows, directory)
+  const [directory, taskTitles] = await Promise.all([
+    enrichActorsFromDirectory(rows),
+    enrichTaskTitles(rows),
+  ])
+  return mapActivityRows(rows, directory, taskTitles)
 }
 
 export async function fetchActivity(limit = 40): Promise<ActivityItem[]> {

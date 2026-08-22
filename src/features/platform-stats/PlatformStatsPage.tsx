@@ -73,7 +73,7 @@ const chartTooltipStyle = {
   fontSize: 11,
 }
 
-const PIE_COLORS = ['#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#a855f7']
+const PIE_COLORS = ['#ED34D6', '#470872', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#340565']
 
 function DeltaBadge({ value, pct }: { value: number; pct: number }) {
   const positive = value >= 0
@@ -315,8 +315,8 @@ export function PlatformStatsPage() {
                     <AreaChart data={viewershipSeries} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                       <defs>
                         <linearGradient id="psViewersGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.35} />
-                          <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.02} />
+                          <stop offset="0%" stopColor="#ED34D6" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="#ED34D6" stopOpacity={0.02} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
@@ -327,7 +327,7 @@ export function PlatformStatsPage() {
                         type="monotone"
                         dataKey="viewers"
                         name="Viewers roster"
-                        stroke="#8b5cf6"
+                        stroke="#ED34D6"
                         fill="url(#psViewersGrad)"
                         strokeWidth={2}
                       />
@@ -485,7 +485,7 @@ export function PlatformStatsPage() {
                       <YAxis tick={{ fill: '#E5E7EB', fontSize: 10 }} allowDecimals={false} />
                       <Tooltip contentStyle={chartTooltipStyle} />
                       <Legend wrapperStyle={{ fontSize: 10 }} />
-                      <Line type="monotone" dataKey="viewers" name="Viewers roster" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="viewers" name="Viewers roster" stroke="#ED34D6" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -511,7 +511,7 @@ export function PlatformStatsPage() {
                       <YAxis yAxisId="right" orientation="right" tick={{ fill: '#E5E7EB', fontSize: 10 }} allowDecimals={false} />
                       <Tooltip contentStyle={chartTooltipStyle} />
                       <Legend wrapperStyle={{ fontSize: 10 }} />
-                      <Line yAxisId="left" type="monotone" dataKey="viewers" name="Avg CCV" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                      <Line yAxisId="left" type="monotone" dataKey="viewers" name="Avg CCV" stroke="#ED34D6" strokeWidth={2} dot={false} />
                       <Line yAxisId="right" type="monotone" dataKey="liveCount" name="Avg canales" stroke="#22c55e" strokeWidth={2} dot={false} />
                       <Line yAxisId="left" type="monotone" dataKey="ratio" name="Ratio" stroke="#06b6d4" strokeWidth={2} dot={false} strokeDasharray="4 3" />
                     </LineChart>
@@ -656,7 +656,7 @@ export function PlatformStatsPage() {
                       <XAxis type="number" tick={{ fill: '#E5E7EB', fontSize: 10 }} />
                       <YAxis type="category" dataKey="category" width={120} tick={{ fill: '#E5E7EB', fontSize: 9 }} />
                       <Tooltip contentStyle={chartTooltipStyle} />
-                      <Bar dataKey="avgViewers" name="Avg viewers" fill="#3b82f6" radius={[0, 3, 3, 0]} />
+                      <Bar dataKey="avgViewers" name="Avg viewers" fill="#ED34D6" radius={[0, 3, 3, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -719,7 +719,7 @@ export function PlatformStatsPage() {
                     <XAxis dataKey="displayName" tick={{ fill: '#E5E7EB', fontSize: 9 }} interval={0} angle={-20} textAnchor="end" height={50} />
                     <YAxis tick={{ fill: '#E5E7EB', fontSize: 10 }} allowDecimals={false} />
                     <Tooltip contentStyle={chartTooltipStyle} />
-                    <Bar dataKey="avgViewers" name="Avg viewers 7d" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="avgViewers" name="Avg viewers 7d" fill="#ED34D6" radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

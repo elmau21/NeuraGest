@@ -107,9 +107,9 @@ export function MovingAverageSimulator({
               <YAxis tick={{ fill: '#9aa4b5', fontSize: 9 }} allowDecimals={false} />
               <Tooltip contentStyle={tooltipStyle} />
               <Legend wrapperStyle={{ fontSize: 10 }} />
-              <Line type="monotone" dataKey="viewers" name="Viewers" stroke="#3b82f6" dot={false} strokeWidth={1.5} connectNulls={false} />
+              <Line type="monotone" dataKey="viewers" name="Viewers" stroke="#ED34D6" dot={false} strokeWidth={1.5} connectNulls={false} />
               <Line type="monotone" dataKey="sma" name={`SMA(${windowSize})`} stroke="#22c55e" dot={false} strokeWidth={1.5} connectNulls={false} />
-              <Line type="monotone" dataKey="ema" name="EMA" stroke="#8b5cf6" dot={false} strokeWidth={1.5} connectNulls={false} />
+              <Line type="monotone" dataKey="ema" name="EMA" stroke="#ED34D6" dot={false} strokeWidth={1.5} connectNulls={false} />
               <Line type="monotone" dataKey="projected" name="Proyección" stroke="#f59e0b" strokeDasharray="4 4" dot={false} strokeWidth={1.5} connectNulls={false} />
             </LineChart>
           </ResponsiveContainer>

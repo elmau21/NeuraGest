@@ -1,6 +1,8 @@
 import { supabase } from '@/services/supabase'
 import { currentActorMeta, logActivity } from '@/services/activity-log'
 import { DEFAULT_ORG_ID } from '@/services/org'
+import { readCache, writeCache } from '@/services/offline-cache'
+import { useOfflineStore } from '@/stores/offline-store'
 import type { Database } from '@/types/supabase'
 
 export type DirectivaAprobacion = 'si' | 'no' | 'pendiente'
@@ -129,14 +131,32 @@ async function actorFields() {
 }
 
 export async function listEventFichas(): Promise<EventFicha[]> {
-  if (!supabase) return []
-  const { data, error } = await supabase
-    .from('ops_event_fichas')
-    .select(SELECT)
-    .eq('organization_id', DEFAULT_ORG_ID)
-    .order('updated_at', { ascending: false })
-  if (error || !data) return []
-  return (data as FichaRow[]).map(mapRow)
+  const setCacheMode = useOfflineStore.getState().setUsingCache
+  if (!supabase) {
+    const cached = readCache<EventFicha[]>('event-fichas')
+    setCacheMode(Boolean(cached?.length))
+    return cached ?? []
+  }
+  try {
+    const { data, error } = await supabase
+      .from('ops_event_fichas')
+      .select(SELECT)
+      .eq('organization_id', DEFAULT_ORG_ID)
+      .order('updated_at', { ascending: false })
+    if (error || !data) {
+      const cached = readCache<EventFicha[]>('event-fichas')
+      setCacheMode(Boolean(cached?.length))
+      return cached ?? []
+    }
+    const mapped = (data as FichaRow[]).map(mapRow)
+    writeCache('event-fichas', mapped)
+    setCacheMode(false)
+    return mapped
+  } catch {
+    const cached = readCache<EventFicha[]>('event-fichas')
+    setCacheMode(Boolean(cached?.length))
+    return cached ?? []
+  }
 }
 
 export async function fetchEventFicha(id: string): Promise<EventFicha | null> {

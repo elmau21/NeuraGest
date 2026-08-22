@@ -1,6 +1,12 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { X } from '@/components/icons'
+import { CheckCircle2, CircleAlert, Info, X } from '@/components/icons'
 import { useToastStore } from '@/stores/toast-store'
+
+const TOAST_ICONS = {
+  success: CheckCircle2,
+  error: CircleAlert,
+  info: Info,
+} as const
 
 export function ToastHost() {
   const toasts = useToastStore((s) => s.toasts)
@@ -10,7 +16,9 @@ export function ToastHost() {
   return (
     <div className="toast-host" aria-live="polite" aria-relevant="additions">
       <AnimatePresence initial={false}>
-        {toasts.map((toast) => (
+        {toasts.map((toast) => {
+          const Icon = TOAST_ICONS[toast.tone]
+          return (
           <motion.div
             key={toast.id}
             className={`toast-item toast-${toast.tone}`}
@@ -20,7 +28,20 @@ export function ToastHost() {
             exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: reduceMotion ? 0.01 : 0.18 }}
           >
+            <Icon className="toast-icon" size={16} strokeWidth={1.6} aria-hidden />
             <span>{toast.message}</span>
+            {toast.action ? (
+              <button
+                type="button"
+                className="toast-action"
+                onClick={() => {
+                  toast.action?.onClick()
+                  dismiss(toast.id)
+                }}
+              >
+                {toast.action.label}
+              </button>
+            ) : null}
             <button
               type="button"
               className="toast-dismiss"
@@ -30,7 +51,8 @@ export function ToastHost() {
               <X size={13} />
             </button>
           </motion.div>
-        ))}
+          )
+        })}
       </AnimatePresence>
     </div>
   )

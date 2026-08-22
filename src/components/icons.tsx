@@ -47,6 +47,7 @@ import {
   LuContact,
   LuDatabase,
   LuDownload,
+  LuEllipsis,
   LuExternalLink,
   LuEye,
   LuEyeOff,
@@ -195,6 +196,7 @@ export const Columns3 = compat(LuColumns3)
 export const Contact = compat(LuContact)
 export const Database = compat(LuDatabase)
 export const Download = compat(LuDownload)
+export const Ellipsis = compat(LuEllipsis)
 export const ExternalLink = compat(LuExternalLink)
 export const Eye = compat(LuEye)
 export const EyeOff = compat(LuEyeOff)

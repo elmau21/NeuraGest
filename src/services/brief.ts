@@ -109,7 +109,7 @@ function briefHtml(input: BriefDocInput): string {
   body{font-family:Georgia,serif;background:#fafafa;color:#18181b;margin:0;padding:48px}
   article{max-width:680px;margin:0 auto;background:#fff;border:1px solid #e4e4e7;border-radius:8px;padding:40px}
   h1{font-size:26px;margin:0 0 8px} .meta{color:#71717a;font-size:14px;margin-bottom:28px}
-  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#7c3aed;margin:24px 0 8px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#ED34D6;margin:24px 0 8px}
   p{line-height:1.65;font-size:15px;margin:0}
   ul{margin:8px 0;padding-left:20px}
 </style></head><body><article>

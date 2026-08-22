@@ -12,6 +12,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { Plus } from '@/components/icons'
+import { DismissibleHint } from '@/components/DismissibleHint'
 import { useTasksStore } from '@/stores/tasks-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { canMutate } from '@/services/permissions'
@@ -277,7 +278,12 @@ export function TasksPage() {
         <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>{label}</button>
       ))}
     </div>
-    {loading && tasks.length === 0 ? <p className="empty-state">Cargando tareas…</p> : null}
+    {loading && tasks.length === 0 ? <p className="empty-state is-loading">Cargando tareas…</p> : null}
+    {view === 'kanban' && !readonly ? (
+      <DismissibleHint storageKey="ng-hint-kanban-drag">
+        Arrastra las tarjetas entre columnas para cambiar el estado.
+      </DismissibleHint>
+    ) : null}
     {view === 'kanban' && <KanbanView tasks={tasks} readonly={readonly} onOpen={select} onDelete={(id, title) => void deleteTaskWithConfirm(id, title)} />}
     {view === 'list' && <ListView tasks={tasks} readonly={readonly} onOpen={select} onDelete={(id, title) => void deleteTaskWithConfirm(id, title)} />}
     {view === 'timeline' && <TimelineView tasks={tasks} onOpen={select} />}

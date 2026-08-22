@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { Radio, RefreshCw, Users } from '@/components/icons'
+import { Eye, Radio, RefreshCw, Users, WifiOff } from '@/components/icons'
 import { useAppStore } from '@/stores/app-store'
 import { isTauri } from '@/services/twitch'
 import { useMetricHistory } from '@/hooks/useMetricHistory'
@@ -60,11 +60,39 @@ export function WarRoomPage() {
         </div>
       </div>
 
-      <div className="kpi-grid ops-kpi-4">
-        <div className="card"><span>En directo</span><b className="ops-live-count">{liveTalents.length}</b></div>
-        <div className="card"><span>Offline</span><b>{offlineCount}</b></div>
-        <div className="card"><span>Viewers totales</span><b>{liveTalents.reduce((s, t) => s + t.viewers, 0).toLocaleString('es-MX')}</b></div>
-        <div className="card"><span>Tiempo real</span><b>{eventSub?.state === 'connected' ? 'Conectado' : eventSub?.state === 'connecting' ? 'Conectando' : eventSub?.state === 'fallback_polling' ? 'Modo alterno' : 'Desconectado'}</b></div>
+      <div className="vision-stat-grid ops-kpi-4">
+        <article className="vision-stat-card live">
+          <div className="vision-stat-icon"><Radio size={20} strokeWidth={1.6} /></div>
+          <div className="vision-stat-body">
+            <span>En directo</span>
+            <strong className="ops-live-count">{liveTalents.length}</strong>
+            <em>Canales activos ahora</em>
+          </div>
+        </article>
+        <article className="vision-stat-card">
+          <div className="vision-stat-icon"><WifiOff size={20} strokeWidth={1.6} /></div>
+          <div className="vision-stat-body">
+            <span>Offline</span>
+            <strong>{offlineCount}</strong>
+            <em>En cartera sin emisión</em>
+          </div>
+        </article>
+        <article className="vision-stat-card">
+          <div className="vision-stat-icon"><Eye size={20} strokeWidth={1.6} /></div>
+          <div className="vision-stat-body">
+            <span>Viewers totales</span>
+            <strong>{liveTalents.reduce((s, t) => s + t.viewers, 0).toLocaleString('es-MX')}</strong>
+            <em>Audiencia simultánea</em>
+          </div>
+        </article>
+        <article className="vision-stat-card ok">
+          <div className="vision-stat-icon"><Users size={20} strokeWidth={1.6} /></div>
+          <div className="vision-stat-body">
+            <span>Tiempo real</span>
+            <strong>{eventSub?.state === 'connected' ? 'Conectado' : eventSub?.state === 'connecting' ? 'Conectando' : eventSub?.state === 'fallback_polling' ? 'Modo alterno' : 'Desconectado'}</strong>
+            <em>EventSub / polling</em>
+          </div>
+        </article>
       </div>
 
       <ActiveUsersPanel />
@@ -89,6 +117,7 @@ export function WarRoomPage() {
             <h3>Tablero de estado</h3>
             <span>Métricas rápidas y tendencia reciente</span>
           </div>
+          <div className="table-scroll-wrap war-room-scroll">
           <div className="ops-noc-grid">
             {liveTalents.map((talent) => {
               const recent = snapshots
@@ -123,6 +152,7 @@ export function WarRoomPage() {
                 </div>
               )
             })}
+          </div>
           </div>
         </>
       )}

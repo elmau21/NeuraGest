@@ -50,10 +50,12 @@ type AppState = {
   lastTwitchUpdate?: string
   persistedToSupabase: boolean
   commandOpen: boolean
+  shortcutsOpen: boolean
   refreshTalentData: () => Promise<void>
   moveTask: (id: string, status: TaskStatus) => void
   addTask: (task: WorkTask) => void
   setCommandOpen: (open: boolean) => void
+  setShortcutsOpen: (open: boolean) => void
 }
 
 let refreshInFlight: Promise<void> | null = null
@@ -70,6 +72,7 @@ export const useAppStore = create<AppState>()(
       twitchLoading: false,
       persistedToSupabase: false,
       commandOpen: false,
+      shortcutsOpen: false,
       refreshTalentData: async () => {
         if (refreshInFlight) return refreshInFlight
         if (!isTauri) {
@@ -132,6 +135,7 @@ export const useAppStore = create<AppState>()(
         set((state) => ({ tasks: state.tasks.map((task) => task.id === id ? { ...task, status } : task) })),
       addTask: (task) => set((state) => ({ tasks: [...state.tasks, task] })),
       setCommandOpen: (commandOpen) => set({ commandOpen }),
+      setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
     }),
     {
       name: 'neuragest-real-data-v3',

@@ -6,6 +6,7 @@ import {
   File as FileIcon,
   Folder,
   FolderLock,
+  FolderOpen,
   FolderPlus,
   HardDrive,
   Pencil,
@@ -21,6 +22,11 @@ import {
   mergeLocalContracts,
   type LocalContract,
 } from '@/features/documents/contracts-data'
+import {
+  buildPdfPreviewSrc,
+  probeDocumentPreview,
+  type DocumentPreviewMode,
+} from '@/features/documents/document-preview-utils'
 import {
   categoryRootPath,
   createDocumentDriveFolder,
@@ -43,9 +49,14 @@ import {
 } from '@/services/document-drive'
 import { logContractActivity } from '@/services/audit'
 import { listAppUsers } from '@/services/app-users'
-import { canAccessContratos, canCreateDocumentDriveFolder, canMutate } from '@/services/permissions'
+import { canAccessContratos, canCreateDocumentDriveFolder, canMutate, getContratosDenial } from '@/services/permissions'
+import { trackRecentDocument } from '@/services/offline-cache'
 import { useAuthStore } from '@/stores/auth-store'
 import { toastError, toastSuccess } from '@/stores/toast-store'
+import { EmptyState } from '@/components/EmptyState'
+import { PermissionGate } from '@/components/PermissionGate'
+import { DismissibleHint } from '@/components/DismissibleHint'
+import { RowActionMenu } from '@/components/RowActionMenu'
 
 type Crumb =
   | { type: 'root'; name: string }
@@ -88,7 +99,77 @@ function localToDriveItem(contract: LocalContract): DocumentDriveItem {
   }
 }
 
-export function DocumentDrive() {
+async function crumbsForDriveItem(item: DocumentDriveItem): Promise<Crumb[]> {
+  const ancestors: DocumentDriveItem[] = []
+  let cursor: DocumentDriveItem | null = item
+  while (cursor?.parentId) {
+    const parent = await getDocumentDriveItem(cursor.parentId)
+    if (!parent) break
+    ancestors.unshift(parent)
+    cursor = parent
+  }
+
+  const crumbs: Crumb[] = [{ type: 'root', name: 'Archivos' }]
+
+  if (item.category === ROOT_CUSTOM_CATEGORY || item.isRootCustom) {
+    const customRoot =
+      ancestors.find((row) => row.isRootCustom || (row.category === ROOT_CUSTOM_CATEGORY && row.parentId == null))
+      ?? (item.category === ROOT_CUSTOM_CATEGORY && item.parentId == null ? item : null)
+    if (customRoot) {
+      crumbs.push({ type: 'customRoot', id: customRoot.id, name: customRoot.title, path: customRoot.path })
+      for (const folder of ancestors.filter((row) => row.id !== customRoot.id && row.kind === 'folder')) {
+        crumbs.push({
+          type: 'folder',
+          category: ROOT_CUSTOM_CATEGORY,
+          id: folder.id,
+          name: folder.title,
+          path: folder.path,
+        })
+      }
+      if (item.kind === 'folder' && item.id !== customRoot.id) {
+        crumbs.push({
+          type: 'folder',
+          category: ROOT_CUSTOM_CATEGORY,
+          id: item.id,
+          name: item.title,
+          path: item.path,
+        })
+      }
+    }
+    return crumbs
+  }
+
+  const category = item.category as DocumentDriveCategory
+  if (!DOCUMENT_DRIVE_CATEGORIES.includes(category)) return crumbs
+
+  crumbs.push({
+    type: 'category',
+    category,
+    name: ROOT_FOLDER_META[category].label,
+    path: categoryRootPath(category),
+  })
+  for (const folder of ancestors.filter((row) => row.kind === 'folder')) {
+    crumbs.push({ type: 'folder', category, id: folder.id, name: folder.title, path: folder.path })
+  }
+  if (item.kind === 'folder') {
+    crumbs.push({ type: 'folder', category, id: item.id, name: item.title, path: item.path })
+  }
+  return crumbs
+}
+
+type DocumentDriveProps = {
+  deepDoc?: string | null
+  deepFolder?: string | null
+  deepCategory?: string | null
+  onDeepLinkHandled?: () => void
+}
+
+export function DocumentDrive({
+  deepDoc = null,
+  deepFolder = null,
+  deepCategory = null,
+  onDeepLinkHandled,
+}: DocumentDriveProps) {
   const roles = useAuthStore((s) => s.roles)
   const session = useAuthStore((s) => s.session)
   const readonly = !canMutate(roles, session?.login)
@@ -115,6 +196,9 @@ export function DocumentDrive() {
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState<PreviewTarget | null>(null)
   const [previewError, setPreviewError] = useState(false)
+  const [previewMode, setPreviewMode] = useState<DocumentPreviewMode>('loading')
+  const [previewHtml, setPreviewHtml] = useState('')
+  const [highlightedId, setHighlightedId] = useState<string | null>(null)
 
   const current = crumbs[crumbs.length - 1]
   const atRoot = current.type === 'root'
@@ -174,16 +258,16 @@ export function DocumentDrive() {
       listAppUsers().catch(() => []),
       driveCategory === 'Contratos' && parentId == null
         ? loadRemoteContractUrls().then(mergeLocalContracts)
-        : Promise.resolve(localItems),
+        : Promise.resolve(null),
     ])
     setItems(rows)
-    if (driveCategory === 'Contratos' && parentId == null) setLocalItems(remote)
+    if (remote) setLocalItems(remote)
     const names: Record<string, string> = {}
     for (const u of users) {
       names[u.id] = u.displayName?.trim() || (u.twitchLogin ? `@${u.twitchLogin}` : u.id.slice(0, 8))
     }
     setUploaderNames(names)
-  }, [atRoot, driveCategory, parentId, canAccessContracts, localItems])
+  }, [atRoot, driveCategory, parentId, canAccessContracts])
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -272,6 +356,7 @@ export function DocumentDrive() {
 
   const openFolder = (item: DocumentDriveItem) => {
     if (!driveCategory) return
+    trackRecentDocument({ id: item.id, title: item.title, path: item.path, category: driveCategory })
     setPreview(null)
     setCrumbs((prev) => [
       ...prev,
@@ -286,6 +371,7 @@ export function DocumentDrive() {
   }
 
   const selectFile = (item: DocumentDriveItem) => {
+    trackRecentDocument({ id: item.id, title: item.title, path: item.path, category: driveCategory ?? undefined })
     void (async () => {
       let target = item
 
@@ -415,6 +501,74 @@ export function DocumentDrive() {
     }
   }
 
+  const downloadItem = (item: DocumentDriveItem) => {
+    void (async () => {
+      let target = item
+      if (!item.isLocal && !item.url) {
+        try {
+          const fresh = await getDocumentDriveItem(item.id)
+          if (fresh) target = fresh
+        } catch { /* ignore */ }
+      }
+      const url = target.isLocal ? target.localUrl : target.url
+      if (!url) {
+        toastError('No se pudo descargar el archivo')
+        return
+      }
+      window.open(url, '_blank', 'noopener,noreferrer')
+      if (driveCategory) {
+        void logDocumentDriveActivity('downloaded', target.fileName ?? target.title, driveCategory, target.id)
+      }
+    })()
+  }
+
+  const renderFileActions = (item: DocumentDriveItem) => (
+    <RowActionMenu
+      actions={[
+        { id: 'open', label: 'Abrir', onClick: () => selectFile(item) },
+        { id: 'download', label: 'Descargar', onClick: () => downloadItem(item) },
+        {
+          id: 'delete',
+          label: 'Eliminar',
+          danger: true,
+          hidden: readonly || item.isLocal,
+          onClick: () => void removeItem(item),
+        },
+      ]}
+    />
+  )
+
+  useEffect(() => {
+    if (!deepDoc && !deepFolder && !deepCategory) return
+    let cancelled = false
+    void (async () => {
+      try {
+        if (
+          deepCategory
+          && DOCUMENT_DRIVE_CATEGORIES.includes(deepCategory as DocumentDriveCategory)
+        ) {
+          if (deepCategory === 'Contratos' && !canAccessContracts) return
+          openCategory(deepCategory as DocumentDriveCategory)
+          onDeepLinkHandled?.()
+          return
+        }
+        const targetId = deepDoc ?? deepFolder
+        if (!targetId) return
+        const item = await getDocumentDriveItem(targetId)
+        if (!item || cancelled) return
+        const nextCrumbs = await crumbsForDriveItem(item)
+        if (cancelled) return
+        setCrumbs(nextCrumbs)
+        setHighlightedId(item.id)
+        if (item.kind === 'file') selectFile(item)
+        onDeepLinkHandled?.()
+      } catch {
+        if (!cancelled) toastError('No se pudo abrir el archivo o carpeta del enlace')
+      }
+    })()
+    return () => { cancelled = true }
+  }, [deepDoc, deepFolder, deepCategory, canAccessContracts, onDeepLinkHandled])
+
   const previewUrl = preview
     ? preview.kind === 'local'
       ? preview.contract.remoteUrl ?? preview.contract.localUrl
@@ -436,8 +590,9 @@ export function DocumentDrive() {
     }
     return 'Documento'
   })()
-  const showPdfSplit = Boolean(
-    canAccessContracts &&
+  const inContratos = driveCategory === 'Contratos' && canAccessContracts && inDrive
+  const showContractsLayout = inContratos
+  const showPdfPreview = Boolean(
     preview &&
     previewUrl &&
     (preview.kind === 'local' || isPdfItem(preview.item)),
@@ -445,7 +600,21 @@ export function DocumentDrive() {
 
   useEffect(() => {
     setPreviewError(false)
-  }, [previewUrl])
+    setPreviewMode('loading')
+    setPreviewHtml('')
+    if (!previewUrl) return
+
+    let cancelled = false
+    void probeDocumentPreview(previewUrl, previewFileName).then((result) => {
+      if (cancelled) return
+      setPreviewMode(result.mode)
+      if (result.mode === 'html' && result.html) setPreviewHtml(result.html)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [previewUrl, previewFileName])
 
   const onPreviewIframeError = () => {
     setPreviewError(true)
@@ -453,7 +622,8 @@ export function DocumentDrive() {
   }
 
   const isSelected = (item: DocumentDriveItem) =>
-    (preview?.kind === 'drive' && preview.item.id === item.id)
+    highlightedId === item.id
+    || (preview?.kind === 'drive' && preview.item.id === item.id)
     || (preview?.kind === 'local' && preview.contract.id === item.id)
 
   const fileMeta = (item: DocumentDriveItem) => {
@@ -480,18 +650,20 @@ export function DocumentDrive() {
   const driveToolbar = (
       <div className="doc-drive-toolbar">
         {inDrive && (
-          <label className="contract-search">
-            <Search size={15} />
+          <div className="contract-search doc-drive-search" role="search">
+            <Search size={15} aria-hidden />
             <input
+              type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={driveCategory === 'Contratos' ? 'Buscar contrato o talento…' : 'Buscar archivo…'}
+              aria-label={driveCategory === 'Contratos' ? 'Buscar contrato o talento' : 'Buscar archivo'}
             />
-          </label>
+          </div>
         )}
         <div className="doc-drive-actions">
-          <button className="secondary" disabled={loading || busy} onClick={() => void reload()} title="Actualizar">
-            <RefreshCw size={16} />
+          <button className="secondary ghost-btn" disabled={loading || busy} onClick={() => void reload()} title="Actualizar lista">
+            <RefreshCw size={16} /> Actualizar
           </button>
           {canCreateFolder && (atRoot || inDrive) && (
             <button
@@ -530,19 +702,20 @@ export function DocumentDrive() {
   )
 
   const driveBreadcrumb = (
-      <nav className="cd-breadcrumb" aria-label="Ruta de carpetas">
+      <nav className="cd-breadcrumb" aria-label="Ubicación actual">
         {crumbs.map((crumb, index) => {
           const isCurrent = index === crumbs.length - 1
+          const isRoot = index === 0
           return (
             <span key={`${crumb.type}-${index}`} className="cd-crumb">
               {index > 0 && <span className="cd-crumb-sep" aria-hidden>/</span>}
               <button
                 type="button"
-                className={[index === 0 ? 'is-root' : undefined, isCurrent ? 'is-current' : undefined].filter(Boolean).join(' ') || undefined}
+                className={[isRoot ? 'is-root' : undefined, isCurrent ? 'is-current' : undefined].filter(Boolean).join(' ') || undefined}
                 onClick={() => goCrumb(index)}
                 aria-current={isCurrent ? 'location' : undefined}
               >
-                {crumb.name}
+                {isRoot ? <><FolderOpen size={13} aria-hidden /> {crumb.name}</> : crumb.name}
               </button>
             </span>
           )
@@ -579,7 +752,9 @@ export function DocumentDrive() {
   const driveAlerts = (
     <>
       {contratosBlocked && (
-        <p className="integration-note staff-readonly-banner">No tienes acceso a contratos</p>
+        <PermissionGate allowed={false} denial={getContratosDenial()}>
+          <></>
+        </PermissionGate>
       )}
       {canCreateFolder && current.type === 'root' && (
         <p className="integration-note">
@@ -594,30 +769,37 @@ export function DocumentDrive() {
   )
 
   const renderSplitList = () => {
-    if (loading) return <p className="empty-state">Cargando…</p>
+    if (loading) {
+      const label = driveCategory === 'Contratos' ? 'Cargando contratos…' : 'Cargando documentos…'
+      return <p className="empty-state is-loading">{label}</p>
+    }
     if (filteredItems.length === 0) {
+      const isContratosRoot = driveCategory === 'Contratos' && parentId == null
       return (
-        <div className="cd-empty">
-          <Folder size={36} />
-          <b>Esta carpeta está vacía</b>
-          <span>
-            {canCreateFolder
-              ? 'Crea una subcarpeta o arrastra archivos aquí.'
-              : readonly
-                ? 'Cuando el equipo suba archivos, aparecerán aquí.'
-                : 'Arrastra archivos aquí o usa Subir.'}
-          </span>
-          {canCreateFolder && (
+        <EmptyState
+          icon={isContratosRoot ? FolderLock : Folder}
+          title={isContratosRoot ? 'Sin contratos' : 'Esta carpeta está vacía'}
+          description={
+            isContratosRoot
+              ? 'No hay contratos que coincidan con la búsqueda o aún no se han cargado.'
+              : canCreateFolder
+                ? 'Crea una subcarpeta o arrastra archivos aquí.'
+                : readonly
+                  ? 'Cuando el equipo suba archivos, aparecerán aquí.'
+                  : 'Arrastra archivos aquí o usa Subir.'
+          }
+        >
+          {canCreateFolder ? (
             <button className="secondary" disabled={busy} onClick={() => setFolderOpen(true)}>
               <FolderPlus size={16} /> Nueva carpeta
             </button>
-          )}
-          {!readonly && (
+          ) : null}
+          {!readonly ? (
             <button className="primary" onClick={() => fileRef.current?.click()}>
-              <Upload size={16} /> Subir archivos
+              <Upload size={16} /> Subir archivo
             </button>
-          )}
-        </div>
+          ) : null}
+        </EmptyState>
       )
     }
     return (
@@ -637,30 +819,38 @@ export function DocumentDrive() {
           </button>
         ))}
         {files.map((item) => (
-          <button
+          <div
             key={item.id}
-            type="button"
-            className={isSelected(item) ? 'selected' : undefined}
-            onClick={() => selectFile(item)}
+            className={`cd-file-row${isSelected(item) ? ' selected' : ''}`}
           >
-            <span className="pdf-icon">PDF</span>
-            <span>
-              <b title={item.title}>{item.title}</b>
-              <small>{fileMeta(item)}</small>
-            </span>
-          </button>
+            <button
+              type="button"
+              className="cd-file-row-main"
+              onClick={() => selectFile(item)}
+            >
+              <span className="pdf-icon">PDF</span>
+              <span>
+                <b title={item.title}>{item.title}</b>
+                <small>{fileMeta(item)}</small>
+              </span>
+            </button>
+            {renderFileActions(item)}
+          </div>
         ))}
       </>
     )
   }
 
   const renderGridContent = () => {
-    if (loading) return <p className="empty-state">Cargando…</p>
+    if (loading) {
+      const label = driveCategory === 'Contratos' ? 'Cargando contratos…' : 'Cargando documentos…'
+      return <p className="empty-state is-loading">{label}</p>
+    }
     if (current.type === 'root') {
       return (
         <div className="cd-grid">
           {visibleCategories.map((cat) => (
-            <article key={cat} className="cd-tile is-folder">
+            <article key={cat} className="cd-tile glass-card is-folder">
               <button type="button" className="cd-tile-main" onClick={() => openCategory(cat)}>
                 {cat === 'Contratos' ? <FolderLock size={28} /> : <Folder size={28} />}
                 <b>{ROOT_FOLDER_META[cat].label}</b>
@@ -669,7 +859,7 @@ export function DocumentDrive() {
             </article>
           ))}
           {rootCustomFolders.map((item) => (
-            <article key={item.id} className="cd-tile is-folder">
+            <article key={item.id} className="cd-tile glass-card is-folder">
               <button type="button" className="cd-tile-main" onClick={() => openCustomRootFolder(item)}>
                 <Folder size={28} />
                 {renamingId === item.id ? (
@@ -728,7 +918,7 @@ export function DocumentDrive() {
     return (
       <div className="cd-grid">
         {folders.map((item) => (
-          <article key={item.id} className="cd-tile is-folder">
+          <article key={item.id} className="cd-tile glass-card is-folder">
             <button type="button" className="cd-tile-main" onClick={() => openFolder(item)}>
               <Folder size={28} />
               {renamingId === item.id ? (
@@ -759,7 +949,7 @@ export function DocumentDrive() {
         {files.map((item) => (
           <article
             key={item.id}
-            className={`cd-tile${isSelected(item) ? ' is-selected' : ''}`}
+            className={`cd-tile glass-card${isSelected(item) ? ' is-selected' : ''}`}
           >
             <button type="button" className="cd-tile-main" onClick={() => selectFile(item)}>
               {item.mimeType?.startsWith('image/') && item.url ? (
@@ -831,7 +1021,7 @@ export function DocumentDrive() {
       {driveBreadcrumb}
 
       <div
-        className={`card cd-dropzone doc-drive-zone${inDrive ? ' doc-drive-full' : ''}${dragging ? ' is-dragging' : ''}`}
+        className={`glass-card cd-dropzone doc-drive-zone${inDrive ? ' doc-drive-full' : ''}${dragging ? ' is-dragging' : ''}`}
         {...dropHandlers}
       >
         <div className={`doc-drive-scroll cd-fade-surface${contentFaded ? ' is-faded' : ''}`}>
@@ -844,15 +1034,20 @@ export function DocumentDrive() {
     </>
   )
 
-  if (showPdfSplit) {
+  if (showContractsLayout) {
     return (
       <div className="contracts-layout doc-drive-split">
         <div className="card contracts-panel doc-drive-panel">
           {driveToolbar}
           {driveAlerts}
+          <DismissibleHint storageKey="ng-hint-doc-preview">
+            Haz clic en una fila para ver la vista previa del PDF.
+          </DismissibleHint>
           {driveBreadcrumb}
-          {!loading && filteredItems.length > 0 && (
-            <p className="contracts-count">{filteredItems.length} {filteredItems.length === 1 ? 'elemento' : 'elementos'}</p>
+          {!loading && (
+            <p className="contracts-count">
+              {filteredItems.length} {filteredItems.length === 1 ? 'elemento' : 'elementos'}
+            </p>
           )}
           <div
             className={`doc-drive-list-scroll doc-drive-scroll cd-fade-surface${contentFaded ? ' is-faded' : ''}${dragging ? ' is-dragging' : ''}`}
@@ -865,47 +1060,73 @@ export function DocumentDrive() {
           {folderModal}
         </div>
         <div className="card contract-viewer">
-          <div className="contract-viewer-head">
-            <div>
-              <b>{previewTitle}</b>
-              <span>{previewFileName} · {previewCategoryLabel} / PDF</span>
-            </div>
-            <a href={previewUrl!} target="_blank" rel="noreferrer"><ExternalLink size={15} />Abrir</a>
-            <a
-              href={previewUrl!}
-              download={previewFileName}
-              onClick={() => {
-                if (preview?.kind === 'local') {
-                  void logContractActivity('downloaded', preview.contract.fileName, preview.contract.talent?.login)
-                } else if (preview?.kind === 'drive' && driveCategory) {
-                  void logDocumentDriveActivity('downloaded', preview.item.fileName ?? preview.item.title, driveCategory, preview.item.id)
-                }
-              }}
-            >
-              <Download size={15} />Descargar
-            </a>
-          </div>
-          {previewError ? (
-            <div className="contract-empty">
-              <FileIcon size={28} />
-              <span>No se pudo cargar la vista previa.</span>
-              <a className="secondary" href={previewUrl!} target="_blank" rel="noreferrer">
-                <ExternalLink size={14} /> Abrir en navegador
-              </a>
-            </div>
+          {showPdfPreview ? (
+            <>
+              <div className="contract-viewer-head">
+                <div>
+                  <b>{previewTitle}</b>
+                  <span>{previewFileName} · {previewCategoryLabel} / PDF</span>
+                </div>
+                <a href={previewUrl!} target="_blank" rel="noreferrer"><ExternalLink size={15} />Abrir</a>
+                <a
+                  href={previewUrl!}
+                  download={previewFileName}
+                  onClick={() => {
+                    if (preview?.kind === 'local') {
+                      void logContractActivity('downloaded', preview.contract.fileName, preview.contract.talent?.login)
+                    } else if (preview?.kind === 'drive' && driveCategory) {
+                      void logDocumentDriveActivity('downloaded', preview.item.fileName ?? preview.item.title, driveCategory, preview.item.id)
+                    }
+                  }}
+                >
+                  <Download size={15} />Descargar
+                </a>
+              </div>
+              <div className="contract-viewer-body">
+                {previewError ? (
+                  <div className="contract-empty">
+                    <FileIcon size={28} />
+                    <span>No se pudo cargar la vista previa.</span>
+                    <a className="secondary" href={previewUrl!} target="_blank" rel="noreferrer">
+                      <ExternalLink size={14} /> Abrir en navegador
+                    </a>
+                  </div>
+                ) : previewMode === 'html' && previewHtml ? (
+                  <div className="doc-preview-html">
+                    <div
+                      className="doc-preview-html-inner"
+                      dangerouslySetInnerHTML={{ __html: previewHtml }}
+                    />
+                  </div>
+                ) : previewMode === 'loading' ? (
+                  <div className="contract-empty doc-preview-loading">
+                    <RefreshCw size={22} />
+                    <span>Cargando vista previa…</span>
+                  </div>
+                ) : (
+                  <iframe
+                    className="doc-preview-frame"
+                    src={buildPdfPreviewSrc(previewUrl!)}
+                    title={`Vista previa de ${previewTitle}`}
+                    onError={onPreviewIframeError}
+                  />
+                )}
+              </div>
+            </>
           ) : (
-            <iframe
-              src={previewUrl!}
-              title={`Vista previa de ${previewTitle}`}
-              onError={onPreviewIframeError}
-            />
+            <div className="contract-viewer-body">
+              <div className="contract-empty">
+                <FileIcon size={28} />
+                <span>Selecciona un contrato para ver la vista previa</span>
+              </div>
+            </div>
           )}
         </div>
       </div>
     )
   }
 
-  return drivePanel
+  return <div className="doc-drive-page">{drivePanel}</div>
 }
 
 export function documentDriveFileCount(includeContracts = true): number {

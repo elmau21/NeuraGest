@@ -57,7 +57,10 @@ export function NoRoleWaitingPage() {
         )}
 
         <div className="no-role-actions">
-          <button type="button" className="secondary" onClick={() => void logout()}>
+          <p className="no-role-tip">
+            Si crees que deberías tener acceso ya, avisa a tu manager o al equipo de NeuraLive.
+          </p>
+          <button type="button" className="secondary ghost-btn" onClick={() => void logout()}>
             <LogOut size={15} />
             Cerrar sesión
           </button>

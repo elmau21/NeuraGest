@@ -96,7 +96,7 @@ export function formatActivityLabel(
         `comentó en una tarea${meta.preview ? `: «${meta.preview}»` : ''}`,
       )
     case 'task.reassigned':
-      return withActor(actorName, `reasignó la tarea «${title || meta.taskId || ''}»`)
+      return withActor(actorName, `reasignó la tarea «${title || 'sin título'}»`)
     case 'calendar.created':
       return withActor(actorName, `creó el evento «${title || meta.event_type || 'calendario'}»`)
     case 'template.applied':

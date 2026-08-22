@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Download, Plus, Trash2, X } from '@/components/icons'
 import {
   createCalendarEvent,
@@ -11,6 +12,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { canMutate } from '@/services/permissions'
 import { toastError, toastSuccess } from '@/stores/toast-store'
 import type { CalendarItem } from '@/types'
+import { EmptyState } from '@/components/EmptyState'
 
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <div className={`card ${className}`}>{children}</div>
@@ -34,6 +36,7 @@ function formatEventRange(event: CalendarEventRecord): string {
 }
 
 export function CalendarPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [events, setEvents] = useState<CalendarEventRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<CalendarEventRecord | null>(null)
@@ -47,6 +50,16 @@ export function CalendarPage() {
 
   const load = () => void fetchCalendarEvents().then(setEvents).finally(() => setLoading(false))
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    const eventId = searchParams.get('event')
+    if (!eventId || events.length === 0) return
+    const match = events.find((event) => event.id === eventId)
+    if (match) {
+      setSelected(match)
+      setSearchParams({}, { replace: true })
+    }
+  }, [events, searchParams, setSearchParams])
 
   const create = async () => {
     if (readonly) return
@@ -95,7 +108,18 @@ export function CalendarPage() {
     <Card>
       <div className="calendar-head"><h3>{monthLabel}</h3><div><button className="secondary active">Mes</button></div></div>
       {loading && <p className="empty-state calendar-empty">Cargando eventos…</p>}
-      {!loading && events.length === 0 && <p className="empty-state calendar-empty">No hay eventos programados.</p>}
+      {!loading && events.length === 0 && (
+        <EmptyState
+          title="No hay eventos programados"
+          description="Crea streams, reuniones o entregas para verlas en el calendario."
+        >
+          {!readonly ? (
+            <button className="primary" onClick={() => void create()}>
+              <Plus size={16} /> Nuevo evento
+            </button>
+          ) : null}
+        </EmptyState>
+      )}
       <div className="calendar-grid">
         {['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map((day) => <b key={day}>{day}</b>)}
         {days.map((offset, index) => {

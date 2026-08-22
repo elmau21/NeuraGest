@@ -95,7 +95,7 @@ import { summarizeTwitchTrackerBoost } from './ml-twitchtracker'
 import { TWITCHTRACKER_DISCLAIMER } from '@/services/twitchtracker'
 import { TwitchTrackerPanel } from '@/features/settings/TwitchTrackerPanel'
 
-const CLUSTER_COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444']
+const CLUSTER_COLORS = ['#ED34D6', '#22c55e', '#f59e0b', '#ef4444']
 
 type MlTab =
   | 'forecast'
@@ -903,7 +903,7 @@ function MlPageInner() {
                     <Tooltip contentStyle={{ background: '#0d1117', border: '1px solid #313947', fontSize: 11 }} />
                     <Bar dataKey="riskScore" radius={[0, 4, 4, 0]}>
                       {inactivityRisks.slice(0, 12).map((r) => (
-                        <Cell key={r.login} fill={r.riskLevel === 'crítico' ? '#ef4444' : r.riskLevel === 'alto' ? '#f59e0b' : '#6366f1'} />
+                        <Cell key={r.login} fill={r.riskLevel === 'crítico' ? '#ef4444' : r.riskLevel === 'alto' ? '#f59e0b' : '#470872'} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -959,7 +959,7 @@ function MlPageInner() {
                       <XAxis dataKey="hour" tick={{ fontSize: 9, fill: '#8b95a7' }} />
                       <YAxis tick={{ fontSize: 9, fill: '#8b95a7' }} />
                       <Tooltip contentStyle={{ background: '#0d1117', border: '1px solid #313947', fontSize: 11 }} />
-                      <Area type="monotone" dataKey="intensity" stroke="#6366f1" fill="#6366f133" />
+                      <Area type="monotone" dataKey="intensity" stroke="#ED34D6" fill="#ED34D633" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>

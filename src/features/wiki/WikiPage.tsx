@@ -14,7 +14,13 @@ import {
 import { useAuthStore } from '@/stores/auth-store'
 import { canMutateWiki } from '@/services/permissions'
 
-export function WikiPage() {
+export function WikiPage({
+  pageId = null,
+  onPageHandled,
+}: {
+  pageId?: string | null
+  onPageHandled?: () => void
+} = {}) {
   const [documents, setDocuments] = useState<WikiDocument[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -50,6 +56,15 @@ export function WikiPage() {
   }, [selectedId])
 
   useEffect(() => { void loadDocs() }, [loadDocs])
+
+  useEffect(() => {
+    if (!pageId || documents.length === 0) return
+    const match = documents.find((doc) => doc.id === pageId)
+    if (match) {
+      setSelectedId(match.id)
+      onPageHandled?.()
+    }
+  }, [pageId, documents, onPageHandled])
 
   useEffect(() => {
     if (!editor || !selected) return

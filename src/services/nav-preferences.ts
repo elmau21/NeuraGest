@@ -10,6 +10,17 @@ export const NAV_VISIBILITY_CHANGED = 'neuragest:nav-visibility-changed'
 
 const STORAGE_PREFIX = 'neuragest-nav-visibility'
 
+/** Compatibilidad con títulos de sección renombrados en el sidebar. */
+const LEGACY_SECTION_KEYS: Record<string, string[]> = {
+  'Tu día': ['Tu día', 'Operaciones'],
+  Datos: ['Datos', 'Análisis'],
+}
+
+function sectionHidden(prefs: NavVisibilityPrefs, sectionTitle: string): boolean {
+  const keys = LEGACY_SECTION_KEYS[sectionTitle] ?? [sectionTitle]
+  return keys.some((key) => prefs.sections[key] === true)
+}
+
 function storageKey(login: string) {
   return `${STORAGE_PREFIX}:${login.toLowerCase()}`
 }
@@ -39,11 +50,11 @@ export function saveNavVisibilityPrefs(login: string, prefs: NavVisibilityPrefs)
 }
 
 export function isNavSectionHidden(prefs: NavVisibilityPrefs, sectionTitle: string): boolean {
-  return prefs.sections[sectionTitle] === true
+  return sectionHidden(prefs, sectionTitle)
 }
 
 export function isNavItemHidden(prefs: NavVisibilityPrefs, path: string, sectionTitle: string): boolean {
-  if (isNavSectionHidden(prefs, sectionTitle)) return true
+  if (sectionHidden(prefs, sectionTitle)) return true
   return prefs.items[path] === true
 }
 
