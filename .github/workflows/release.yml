@@ -55,7 +55,7 @@ jobs:
           TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_GITHUB_RELEASES_TOKEN: ${{ secrets.GITHUB_RELEASES_TOKEN }}
+          VITE_GITHUB_RELEASES_TOKEN: ${{ secrets.VITE_GITHUB_RELEASES_TOKEN }}
         run: npm run build:release
 
       - name: Generar latest.json
@@ -123,7 +123,7 @@ jobs:
           TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_GITHUB_RELEASES_TOKEN: ${{ secrets.GITHUB_RELEASES_TOKEN }}
+          VITE_GITHUB_RELEASES_TOKEN: ${{ secrets.VITE_GITHUB_RELEASES_TOKEN }}
         run: npm run build:linux
 
       - name: Subir artefacto Linux (.deb)

@@ -3,8 +3,8 @@ import type { Database } from '../types/supabase'
 import type { Talent } from '../types'
 import { createSupabaseAuthStorage } from '@/services/supabase-auth-storage'
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY
+const url = import.meta.env.VITE_SUPABASE_URL?.trim()
+const key = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()
 
 export const supabase: SupabaseClient<Database> | null = url && key
   ? createClient<Database>(url, key, {
