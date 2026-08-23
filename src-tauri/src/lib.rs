@@ -6,8 +6,10 @@ mod twitch;
 
 
 
-use std::net::{TcpListener, TcpStream};
-
+use std::net::TcpListener;
+#[cfg(not(dev))]
+use std::net::TcpStream;
+#[cfg(not(dev))]
 use std::time::{Duration, Instant};
 
 
@@ -167,7 +169,7 @@ fn pick_ui_port() -> u16 {
 
 
 /// Wait until the localhost plugin accepts TCP (avoids ERR_CONNECTION_REFUSED race).
-
+#[cfg(not(dev))]
 fn wait_for_ui_server(port: u16) {
 
   let addr = format!("127.0.0.1:{port}");

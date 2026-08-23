@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { isActivityNavigable, resolveActivityNavigation } from './activity-navigation'
+import {
+  isActivityNavigable,
+  parseLiveLoginFromLabel,
+  resolveActivityNavigation,
+} from './activity-navigation'
 
 const controlCtx = { canAccessControlCenter: true, canAccessDatos: true, canManageRoles: true }
 const basicCtx = { canAccessControlCenter: false, canAccessDatos: false, canManageRoles: false }
@@ -33,6 +37,28 @@ describe('resolveActivityNavigation', () => {
     expect(
       resolveActivityNavigation(
         { entityType: 'talent', action: 'live', metadata: { displayName: 'Sin login' } },
+      ),
+    ).toEqual({ to: '/war-room' })
+
+    expect(
+      resolveActivityNavigation(
+        {
+          entityType: 'talent',
+          action: 'live',
+          metadata: {},
+          label: 'RyoNikku en vivo · 1 viewers',
+        },
+      ),
+    ).toEqual({ to: '/talento/ryonikku' })
+
+    expect(
+      resolveActivityNavigation(
+        {
+          entityType: 'talent',
+          action: 'live',
+          metadata: {},
+          label: 'Talento en vivo · 0 viewers',
+        },
       ),
     ).toEqual({ to: '/war-room' })
   })
@@ -114,6 +140,14 @@ describe('resolveActivityNavigation', () => {
         controlCtx,
       ),
     ).toEqual({ to: '/talento/nosomevt' })
+  })
+})
+
+describe('parseLiveLoginFromLabel', () => {
+  it('extrae login del texto de alerta live', () => {
+    expect(parseLiveLoginFromLabel('AshitakaSeiren en vivo · 13 viewers')).toBe('ashitakaseiren')
+    expect(parseLiveLoginFromLabel('RyoNikku en vivo · 1 viewers')).toBe('ryonikku')
+    expect(parseLiveLoginFromLabel('Talento en vivo · 0 viewers')).toBeUndefined()
   })
 })
 

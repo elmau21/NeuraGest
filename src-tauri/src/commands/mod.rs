@@ -75,7 +75,7 @@ pub struct TwitchUserProfile {
 }
 
 #[derive(Deserialize)]
-struct TokenResponse {
+pub(crate) struct TokenResponse {
     access_token: String,
     #[serde(default)]
     refresh_token: String,
@@ -156,10 +156,6 @@ pub struct TalentSnapshot {
 
 pub(crate) const TWITCH_CONFIG_MISSING: &str =
     "Falta la configuración de Twitch en esta instalación. Contacta al administrador o reinstala NeuraGest.";
-
-pub(crate) fn configured_client_id() -> Result<String, String> {
-    std::env::var("TWITCH_CLIENT_ID").map_err(|_| TWITCH_CONFIG_MISSING.to_string())
-}
 
 async fn helix_client_id(app: &tauri::AppHandle) -> Result<String, String> {
     twitch_profiles::configured_client_id_for(app).await
@@ -799,9 +795,12 @@ pub async fn fetch_weekly_clips(app: tauri::AppHandle) -> Result<Vec<WeeklyClipR
 #[derive(Debug, Deserialize)]
 struct HelixVideo {
     id: String,
-    user_id: String,
-    user_login: String,
-    user_name: String,
+    #[serde(rename = "user_id")]
+    _user_id: String,
+    #[serde(rename = "user_login")]
+    _user_login: String,
+    #[serde(rename = "user_name")]
+    _user_name: String,
     title: String,
     url: String,
     thumbnail_url: String,

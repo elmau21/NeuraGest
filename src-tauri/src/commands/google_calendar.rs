@@ -72,7 +72,8 @@ struct CalendarEventRow {
     id: String,
     title: String,
     description: Option<String>,
-    event_type: String,
+    #[serde(rename = "event_type")]
+    _event_type: String,
     starts_at: String,
     ends_at: String,
     all_day: Option<bool>,

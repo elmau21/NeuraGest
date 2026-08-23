@@ -126,10 +126,6 @@ pub(crate) async fn configured_client_id_for(app: &tauri::AppHandle) -> Result<S
     resolve_helix_credentials(app).await.map(|(id, _)| id)
 }
 
-pub(crate) async fn configured_client_secret_for(app: &tauri::AppHandle) -> Result<String, String> {
-    resolve_helix_credentials(app).await.map(|(_, secret)| secret)
-}
-
 #[tauri::command]
 pub async fn list_helix_profiles(app: tauri::AppHandle) -> Result<Vec<HelixProfile>, String> {
     let mut store = load_store(&app).await?;

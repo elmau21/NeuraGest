@@ -24,10 +24,10 @@ export function AssistantTasksSummary({ tasks }: { tasks: TaskRecord[] }) {
       </div>
       <div className="cc-section-body">
         <div className="at-summary at-summary-compact">
-          <div className="at-stat"><span>Pendientes</span><strong>{counts.pending}</strong></div>
-          <div className="at-stat warn"><span>Atrasadas</span><strong>{counts.overdue}</strong></div>
-          <div className="at-stat soon"><span>Próximas</span><strong>{counts.dueSoon}</strong></div>
-          <div className="at-stat ok"><span>Hechas</span><strong>{counts.completedRecent}</strong></div>
+          <div className="at-stat"><div className="at-stat-content"><span>Pendientes</span><strong>{counts.pending}</strong></div></div>
+          <div className="at-stat warn"><div className="at-stat-content"><span>Atrasadas</span><strong>{counts.overdue}</strong></div></div>
+          <div className="at-stat soon"><div className="at-stat-content"><span>Próximas</span><strong>{counts.dueSoon}</strong></div></div>
+          <div className="at-stat ok"><div className="at-stat-content"><span>Hechas</span><strong>{counts.completedRecent}</strong></div></div>
         </div>
         {overdue.length > 0 ? (
           <ul className="at-summary-list">

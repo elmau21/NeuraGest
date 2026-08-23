@@ -3,6 +3,8 @@ import { ChevronRight, X } from '@/components/icons'
 import { useNavigate } from 'react-router-dom'
 import type { AppRole } from '@/services/app-users'
 import { useAuthStore } from '@/stores/auth-store'
+import { tourSelectorForRoute } from '@/features/onboarding/tour-selectors'
+import { useTourAnchor } from '@/features/onboarding/useTourAnchor'
 
 const ONBOARDING_KEY = 'neuragest-onboarding-v1'
 
@@ -10,11 +12,15 @@ type OnboardingStep = {
   title: string
   body: string
   route?: string
+  selector?: string
 }
 
 function stepsForRoles(roles: AppRole[]): OnboardingStep[] {
+  const withSelector = (steps: Omit<OnboardingStep, 'selector'>[]): OnboardingStep[] =>
+    steps.map((step) => ({ ...step, selector: tourSelectorForRoute(step.route) }))
+
   if (roles.includes('assistant')) {
-    return [
+    return withSelector([
       {
         title: 'Organiza tus tareas',
         body: 'El panel de tareas concentra pendientes, atrasadas y lo que vence hoy. Empieza aquí cada mañana.',
@@ -30,11 +36,11 @@ function stepsForRoles(roles: AppRole[]): OnboardingStep[] {
         body: 'En el centro de control dejas cobertura, handoff y notas operativas para quien sigue el turno.',
         route: '/control',
       },
-    ]
+    ])
   }
 
   if (roles.includes('league_manager')) {
-    return [
+    return withSelector([
       {
         title: 'Contratos de liga',
         body: 'Gestiona contratos y documentos de jugadores desde Documentos y NeuraLeague.',
@@ -50,11 +56,11 @@ function stepsForRoles(roles: AppRole[]): OnboardingStep[] {
         body: 'Revisa equipos, reclutamiento y operación diaria desde el hub de NeuraLeague.',
         route: '/neuralleague/operacion',
       },
-    ]
+    ])
   }
 
   if (roles.includes('owner') || roles.includes('admin')) {
-    return [
+    return withSelector([
       {
         title: 'War Room',
         body: 'Supervisa varios canales en directo, viewers y alertas desde un solo lugar.',
@@ -70,10 +76,10 @@ function stepsForRoles(roles: AppRole[]): OnboardingStep[] {
         body: 'Define quién puede ver y editar cada área desde Ajustes → Permisos.',
         route: '/ajustes?tab=permisos',
       },
-    ]
+    ])
   }
 
-  return [
+  return withSelector([
     {
       title: 'Tu resumen diario',
       body: 'El dashboard muestra tareas, canales en vivo y pendientes clave al inicio del día.',
@@ -89,7 +95,7 @@ function stepsForRoles(roles: AppRole[]): OnboardingStep[] {
       body: 'Alertas, cobertura y operación del día en un solo panel.',
       route: '/control',
     },
-  ]
+  ])
 }
 
 export function OnboardingModal() {
@@ -98,6 +104,8 @@ export function OnboardingModal() {
   const [stepIndex, setStepIndex] = useState(0)
   const navigate = useNavigate()
   const steps = useMemo(() => stepsForRoles(roles), [roles])
+  const step = steps[stepIndex]
+  const { spotlight, cardStyle, centered } = useTourAnchor(step?.selector, open, `${stepIndex}-${step?.route ?? 'welcome'}`)
 
   useEffect(() => {
     if (roles.length === 0) return
@@ -114,19 +122,35 @@ export function OnboardingModal() {
   }, [])
 
   const go = useCallback((index: number) => {
-    const step = steps[index]
-    if (step?.route) navigate(step.route)
+    const next = steps[index]
+    if (next?.route) navigate(next.route)
     setStepIndex(index)
   }, [navigate, steps])
 
   if (!open || steps.length === 0) return null
 
-  const step = steps[stepIndex]
   const isLast = stepIndex >= steps.length - 1
 
   return (
-    <div className="onboarding-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="onboarding-modal-title">
-      <div className="onboarding-modal-card glass-card">
+    <div
+      className={`onboarding-modal-backdrop${centered ? ' is-centered' : ''}`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="onboarding-modal-title"
+    >
+      {spotlight ? (
+        <div
+          className="tour-spotlight"
+          style={{
+            top: spotlight.top,
+            left: spotlight.left,
+            width: spotlight.width,
+            height: spotlight.height,
+          }}
+          aria-hidden
+        />
+      ) : null}
+      <div className="onboarding-modal-card glass-card" style={cardStyle}>
         <button type="button" className="onboarding-modal-close" onClick={finish} aria-label="Cerrar">
           <X size={16} />
         </button>

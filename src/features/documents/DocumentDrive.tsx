@@ -590,8 +590,8 @@ export function DocumentDrive({
     }
     return 'Documento'
   })()
-  const inContratos = driveCategory === 'Contratos' && canAccessContracts && inDrive
-  const showContractsLayout = inContratos
+  const inContratos = driveCategory === 'Contratos' && canAccessContracts
+  const showSplitLayout = inDrive
   const showPdfPreview = Boolean(
     preview &&
     previewUrl &&
@@ -725,7 +725,7 @@ export function DocumentDrive({
 
   const folderModal = folderOpen ? (
         <div className="modal-backdrop" onClick={() => setFolderOpen(false)}>
-          <div className="agency-modal card" onClick={(e) => e.stopPropagation()}>
+          <div className="agency-modal card doc-folder-modal" onClick={(e) => e.stopPropagation()}>
             <h3><FolderPlus size={16} /> Carpeta nueva</h3>
             <label>
               Nombre
@@ -828,7 +828,15 @@ export function DocumentDrive({
               className="cd-file-row-main"
               onClick={() => selectFile(item)}
             >
-              <span className="pdf-icon">PDF</span>
+              <span>
+                {item.mimeType?.startsWith('image/') && item.url ? (
+                  <img src={item.url} alt="" className="cd-thumb" />
+                ) : isPdfItem(item) ? (
+                  <span className="pdf-icon">PDF</span>
+                ) : (
+                  <FileIcon size={18} />
+                )}
+              </span>
               <span>
                 <b title={item.title}>{item.title}</b>
                 <small>{fileMeta(item)}</small>
@@ -1034,14 +1042,15 @@ export function DocumentDrive({
     </>
   )
 
-  if (showContractsLayout) {
+  if (showSplitLayout) {
     return (
+      <>
       <div className="contracts-layout doc-drive-split">
         <div className="card contracts-panel doc-drive-panel">
           {driveToolbar}
           {driveAlerts}
           <DismissibleHint storageKey="ng-hint-doc-preview">
-            Haz clic en una fila para ver la vista previa del PDF.
+            Haz clic en un archivo para ver la vista previa del PDF.
           </DismissibleHint>
           {driveBreadcrumb}
           {!loading && (
@@ -1057,7 +1066,6 @@ export function DocumentDrive({
               {renderSplitList()}
             </div>
           </div>
-          {folderModal}
         </div>
         <div className="card contract-viewer">
           {showPdfPreview ? (
@@ -1117,12 +1125,18 @@ export function DocumentDrive({
             <div className="contract-viewer-body">
               <div className="contract-empty">
                 <FileIcon size={28} />
-                <span>Selecciona un contrato para ver la vista previa</span>
+                <span>
+                  {inContratos
+                    ? 'Selecciona un contrato para ver la vista previa'
+                    : 'Selecciona un archivo para ver la vista previa'}
+                </span>
               </div>
             </div>
           )}
         </div>
       </div>
+      {folderModal}
+      </>
     )
   }
 

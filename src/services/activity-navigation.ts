@@ -10,16 +10,60 @@ export type ActivityNavigationContext = {
   canManageRoles?: boolean
 }
 
+type ActivityNavigationItem = Pick<
+  ActivityItem,
+  'entityType' | 'entityId' | 'action' | 'metadata'
+> & {
+  label?: string
+}
+
 function metaString(meta: Record<string, unknown>, key: string): string | undefined {
   const value = meta[key]
-  if (typeof value !== 'string') return undefined
-  const trimmed = value.trim()
-  return trimmed || undefined
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed || undefined
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value)
+  }
+  return undefined
+}
+
+function looksLikeTwitchLogin(value: string): string | undefined {
+  const normalized = value.trim().replace(/^@/, '').toLowerCase()
+  if (!/^[a-z0-9_]{3,25}$/.test(normalized)) return undefined
+  return normalized
+}
+
+/** Extrae login de etiquetas tipo «RyoNikku en vivo · 12 viewers». */
+export function parseLiveLoginFromLabel(label: string | undefined): string | undefined {
+  if (!label?.trim()) return undefined
+  const match = label.trim().match(/^(.+?)\s+en\s+vivo(?:\s*·|$)/i)
+  const candidate = match?.[1]?.trim()
+  if (!candidate || candidate.toLowerCase() === 'talento') return undefined
+  return looksLikeTwitchLogin(candidate)
+}
+
+function normalizeTalentLogin(value: string | undefined): string | undefined {
+  if (!value?.trim()) return undefined
+  return looksLikeTwitchLogin(value)
+}
+
+function resolveTalentLiveLogin(item: ActivityNavigationItem): string | undefined {
+  const meta = item.metadata ?? {}
+  return (
+    normalizeTalentLogin(metaString(meta, 'login')) ??
+    normalizeTalentLogin(metaString(meta, 'talentLogin')) ??
+    normalizeTalentLogin(metaString(meta, 'channel')) ??
+    normalizeTalentLogin(item.entityId) ??
+    parseLiveLoginFromLabel(item.label) ??
+    normalizeTalentLogin(metaString(meta, 'displayName'))
+  )
 }
 
 /** Resuelve la ruta de destino para una notificación de actividad, o null si no hay destino. */
 export function resolveActivityNavigation(
-  item: Pick<ActivityItem, 'entityType' | 'entityId' | 'action' | 'metadata'>,
+  item: ActivityNavigationItem,
   ctx: ActivityNavigationContext = {},
 ): ActivityNavigation | null {
   const meta = item.metadata ?? {}
@@ -49,7 +93,7 @@ export function resolveActivityNavigation(
 
     case 'talent':
       if (item.action === 'live') {
-        const login = metaString(meta, 'login') ?? metaString(meta, 'talentLogin')
+        const login = resolveTalentLiveLogin(item)
         if (login) return { to: `/talento/${login}` }
         return { to: '/war-room' }
       }
@@ -122,7 +166,7 @@ export function resolveActivityNavigation(
 }
 
 export function isActivityNavigable(
-  item: Pick<ActivityItem, 'entityType' | 'entityId' | 'action' | 'metadata'>,
+  item: ActivityNavigationItem,
   ctx?: ActivityNavigationContext,
 ): boolean {
   return resolveActivityNavigation(item, ctx) !== null

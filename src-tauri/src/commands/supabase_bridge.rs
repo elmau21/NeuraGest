@@ -56,7 +56,8 @@ pub(crate) struct AppUserRow {
 
 #[derive(Debug, Deserialize)]
 struct AuthAdminUser {
-    id: String,
+    #[serde(rename = "id")]
+    _id: String,
     email: Option<String>,
     #[serde(default)]
     user_metadata: Value,

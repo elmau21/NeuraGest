@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ChevronRight, X } from '@/components/icons'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/auth-store'
+import { useTourAnchor } from '@/features/onboarding/useTourAnchor'
 
 const TOUR_KEY = 'neuragest-manager-tour-done'
 
@@ -58,6 +59,8 @@ export function ManagerTour() {
   const [open, setOpen] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
   const navigate = useNavigate()
+  const step = STEPS[stepIndex]
+  const { spotlight, cardStyle, centered } = useTourAnchor(step?.selector, open, step?.id ?? stepIndex)
 
   useEffect(() => {
     if (!isManagerRole(roles)) return
@@ -74,19 +77,35 @@ export function ManagerTour() {
   }, [])
 
   const go = useCallback((index: number) => {
-    const step = STEPS[index]
-    if (step?.route) navigate(step.route)
+    const next = STEPS[index]
+    if (next?.route) navigate(next.route)
     setStepIndex(index)
   }, [navigate])
 
   if (!open) return null
 
-  const step = STEPS[stepIndex]
   const isLast = stepIndex >= STEPS.length - 1
 
   return (
-    <div className="manager-tour-backdrop" role="dialog" aria-modal="true" aria-labelledby="manager-tour-title">
-      <div className="manager-tour-card">
+    <div
+      className={`manager-tour-backdrop${centered ? ' is-centered' : ''}`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="manager-tour-title"
+    >
+      {spotlight ? (
+        <div
+          className="tour-spotlight"
+          style={{
+            top: spotlight.top,
+            left: spotlight.left,
+            width: spotlight.width,
+            height: spotlight.height,
+          }}
+          aria-hidden
+        />
+      ) : null}
+      <div className="manager-tour-card" style={cardStyle}>
         <button type="button" className="manager-tour-close" onClick={finish} aria-label="Cerrar tour">
           <X size={16}/>
         </button>
