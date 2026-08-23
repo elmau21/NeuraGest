@@ -118,8 +118,22 @@ jobs:
         env:
           GITHUB_REF_NAME: ${{ github.ref_name }}
 
+      - name: Inyectar clave pública del updater
+        env:
+          TAURI_SIGNING_PUBLIC_KEY: ${{ secrets.TAURI_SIGNING_PUBLIC_KEY }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PUBLIC_KEY" ]; then echo "Sin TAURI_SIGNING_PUBLIC_KEY; se usa pubkey del repo."; exit 0; fi
+          node -e "
+            const fs = require('fs');
+            const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));
+            conf.plugins.updater.pubkey = process.env.TAURI_SIGNING_PUBLIC_KEY;
+            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2) + '\n');
+          "
+
       - name: Build Tauri (.deb)
         env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
           TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
