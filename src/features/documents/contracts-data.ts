@@ -19,7 +19,8 @@ export type LocalContract = {
 const talentAliases = [
   ['arikyu_', 'arikyu_', 'Arikyu'],
   ['nosomevt', 'nosomevt', 'Nosome'],
-  ['kumitacui', 'kumitacui', 'Kumitacui'],
+  ['lakumita', 'lakumita', 'Lakumita'],
+  ['kumitacui', 'lakumita', 'Lakumita'],
   ['ryonikku', 'ryonikku', 'Ryonikku'],
   ['suimi', 'suimivt', 'Suimi'],
   ['tesitoazul', 'tesitoazul', 'TesitoAzul'],

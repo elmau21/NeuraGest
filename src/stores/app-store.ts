@@ -11,8 +11,9 @@ import type { CalendarItem, Talent, TaskStatus, WorkTask } from '@/types'
 export type HelixStatus = 'idle' | 'connecting' | 'connected' | 'error'
 
 const REQUIRED_TWITCH_LOGINS = [
-  'arikyu_', 'nosomevt', 'kumitacui', 'ryonikku', 'suimivt',
+  'arikyu_', 'nosomevt', 'lakumita', 'ryonikku', 'suimivt',
   'tesitoazul', 'shisuvr', 'bhikoruvt', 'ashitakaseiren', 'cold__vt',
+  'shirookouwu', 'creeperdutyvt', 'alexyshai',
 ] as const
 
 const preloadedTalents: Talent[] = REQUIRED_TWITCH_LOGINS.map((login) => ({

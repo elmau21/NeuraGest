@@ -3,7 +3,10 @@ insert into public.organizations(id,name,slug) values ('00000000-0000-0000-0000-
 insert into public.talents(organization_id,login,display_name,description) values
 ('00000000-0000-0000-0000-000000000001','arikyu_','Arikyu','Talento NeuraLive'),
 ('00000000-0000-0000-0000-000000000001','nosomevt','Nosome','Talento NeuraLive'),
-('00000000-0000-0000-0000-000000000001','kumitacui','Kumita Cui','Talento NeuraLive'),
+('00000000-0000-0000-0000-000000000001','lakumita','Lakumita','Talento NeuraLive'),
+('00000000-0000-0000-0000-000000000001','shirookouwu','Shirookouwu','Talento NeuraLive'),
+('00000000-0000-0000-0000-000000000001','creeperdutyvt','CreeperDuty VT','Talento NeuraLive'),
+('00000000-0000-0000-0000-000000000001','alexyshai','Alexyshai','Talento NeuraLive'),
 ('00000000-0000-0000-0000-000000000001','ryonikku','Ryonikku','Talento NeuraLive'),
 ('00000000-0000-0000-0000-000000000001','suimivt','Suimi','Talento NeuraLive'),
 ('00000000-0000-0000-0000-000000000001','tesitoazul','Tesito Azul','Talento NeuraLive'),

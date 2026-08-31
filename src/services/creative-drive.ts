@@ -5,6 +5,35 @@ import type { TwitchAssetKind } from '@/services/twitch-asset-rules'
 
 export const CREATIVE_DRIVE_BUCKET = 'creative-drive'
 
+/** ZIP creativos (paquetes de entrega, etc.). */
+export const CREATIVE_DRIVE_ZIP_MAX_BYTES = 500 * 1024 * 1024
+
+/** Límite de subida para archivos que no son ZIP (antes el tope global del bucket). */
+export const CREATIVE_DRIVE_DEFAULT_MAX_BYTES = 100 * 1024 * 1024
+
+export function isCreativeDriveZip(file: Pick<File, 'name' | 'type'>): boolean {
+  const mime = (file.type ?? '').toLowerCase()
+  const name = file.name.toLowerCase()
+  return (
+    mime === 'application/zip'
+    || mime === 'application/x-zip-compressed'
+    || name.endsWith('.zip')
+  )
+}
+
+export function validateCreativeDriveUpload(file: File): string | null {
+  if (isCreativeDriveZip(file)) {
+    if (file.size > CREATIVE_DRIVE_ZIP_MAX_BYTES) {
+      return `El ZIP «${file.name}» supera el máximo de ${CREATIVE_DRIVE_ZIP_MAX_BYTES / (1024 * 1024)} MB.`
+    }
+    return null
+  }
+  if (file.size > CREATIVE_DRIVE_DEFAULT_MAX_BYTES) {
+    return `«${file.name}» supera el máximo de ${CREATIVE_DRIVE_DEFAULT_MAX_BYTES / (1024 * 1024)} MB.`
+  }
+  return null
+}
+
 export type DriveItemKind = 'folder' | 'file'
 
 export type CreativeDriveItem = {

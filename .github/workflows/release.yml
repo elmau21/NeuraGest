@@ -76,6 +76,7 @@ jobs:
             latest.json
 
   build-linux:
+    if: github.ref_name != 'v1.0.12'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -150,6 +151,7 @@ jobs:
 
   publish:
     needs: [build-windows, build-linux]
+    if: always() && needs.build-windows.result == 'success' && (needs.build-linux.result == 'success' || needs.build-linux.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Descargar artefactos

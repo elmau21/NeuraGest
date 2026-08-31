@@ -9,11 +9,12 @@ const sampleTasks: WorkTask[] = [
 describe('app store offline-first', () => {
   beforeEach(() => useAppStore.setState({ tasks: structuredClone(sampleTasks) }))
 
-  it('precarga los diez canales Twitch obligatorios', () => {
+  it('precarga los trece canales Twitch obligatorios', () => {
     const talents = useAppStore.getState().talents
     expect(talents.map((talent) => talent.login)).toEqual([
-      'arikyu_', 'nosomevt', 'kumitacui', 'ryonikku', 'suimivt',
+      'arikyu_', 'nosomevt', 'lakumita', 'ryonikku', 'suimivt',
       'tesitoazul', 'shisuvr', 'bhikoruvt', 'ashitakaseiren', 'cold__vt',
+      'shirookouwu', 'creeperdutyvt', 'alexyshai',
     ])
     expect(talents.find((talent) => talent.login === 'nosomevt')?.displayName).toBe('Nosome')
   })

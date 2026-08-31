@@ -65,7 +65,7 @@ export const CHANNEL_ASSET_SPECS: ChannelAssetSpec[] = [
 ]
 
 export const TWITCH_RULES_BLURB =
-  'Offline 1920×1080 · Banner 1200×480 · Paneles ~320 px de ancho · PNG/JPG/WEBP (GIF en paneles). Pesos: offline/banner ≤10 MB, panel ≤2 MB.'
+  'Offline 1920×1080 · Banner 1200×480 · Paneles ~320 px de ancho · PNG/JPG/WEBP (GIF en paneles). Pesos: offline/banner ≤10 MB, panel ≤2 MB, ZIP ≤500 MB.'
 
 export function detectAssetKind(name: string, assetKind?: string | null): TwitchAssetKind {
   if (assetKind && CHANNEL_ASSET_SPECS.some((s) => s.kind === assetKind)) {

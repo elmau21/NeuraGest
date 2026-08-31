@@ -22,6 +22,7 @@ import {
   setDriveAssetKind,
   setDriveReadyForTwitch,
   uploadDriveFile,
+  validateCreativeDriveUpload,
   type CreativeDriveItem,
 } from '@/services/creative-drive'
 import {
@@ -207,10 +208,22 @@ export function CreativeDrivePage() {
       if (asZip) {
         const zipName = buildZipFileName(current.name)
         const zipFile = await filesToZip(list, zipName)
+        const zipError = validateCreativeDriveUpload(zipFile)
+        if (zipError) {
+          setError(zipError)
+          toastError(zipError)
+          return
+        }
         await uploadDriveFile(zipFile, current.id, current.path)
         toastSuccess('ZIP subido')
       } else {
         for (const file of list) {
+          const uploadError = validateCreativeDriveUpload(file)
+          if (uploadError) {
+            setError(uploadError)
+            toastError(uploadError)
+            return
+          }
           await uploadDriveFile(file, current.id, current.path)
         }
         toastSuccess(list.length === 1 ? 'Subido' : `${list.length} archivos subidos`)

@@ -201,7 +201,7 @@ export function Analytics() {
       <div>
         <span>INTELIGENCIA DE NEGOCIO · MULTI-FUENTE</span>
         <h1>Analítica</h1>
-        <p>Explora y exporta métricas fusionadas de Twitch, estadísticas externas, repeticiones y sesiones de los 10 talentos.</p>
+        <p>Explora y exporta métricas fusionadas de Twitch, estadísticas externas, repeticiones y sesiones de los {talents.length} talentos.</p>
         <TalentSourceCounters counts={sourceCounts} className="an-source-counters" />
         {collectNote && !collectError && (
           <p className="an-collect-note">{collectNote}</p>
@@ -294,7 +294,7 @@ export function Analytics() {
       </div>
 
       <section className="an-panel an-status-matrix">
-        <header><div><h2>Matriz de estado operativa</h2><p>Los 10 canales monitorizados en Twitch</p></div><span>{liveTalents.length} ONLINE</span></header>
+        <header><div><h2>Matriz de estado operativa</h2><p>Los {talents.length} canales monitorizados en Twitch</p></div><span>{liveTalents.length} ONLINE</span></header>
         <div>{talents.map((talent) => <article className={talent.isLive ? 'live' : ''} key={talent.id} title={`${talent.displayName} · ${talent.isLive ? `${talent.viewers} viewers` : 'Offline'}`}><i /><span><b>{talent.displayName}</b><small>{talent.isLive ? `${analyticsNumber.format(talent.viewers)} viewers` : 'Offline'}</small></span></article>)}</div>
       </section>
 

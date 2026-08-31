@@ -14,7 +14,10 @@ use tokio::sync::Mutex;
 const SERVICE: &str = "com.neuralive.neuragest";
 const ACCOUNT: &str = "twitch-oauth";
 const OAUTH_SCOPES: &str = "user:read:email moderator:read:followers channel:read:subscriptions clips:edit";
-pub(crate) const TALENTS: [&str; 10] = ["arikyu_","nosomevt","kumitacui","ryonikku","suimivt","tesitoazul","shisuvr","bhikoruvt","ashitakaseiren","cold__vt"];
+pub(crate) const TALENTS: [&str; 13] = [
+    "arikyu_", "nosomevt", "lakumita", "ryonikku", "suimivt", "tesitoazul", "shisuvr", "bhikoruvt",
+    "ashitakaseiren", "cold__vt", "shirookouwu", "creeperdutyvt", "alexyshai",
+];
 static APP_TOKEN: OnceLock<Mutex<Option<AppAccessToken>>> = OnceLock::new();
 static PENDING_DEVICE: OnceLock<Mutex<Option<PendingDeviceFlow>>> = OnceLock::new();
 
