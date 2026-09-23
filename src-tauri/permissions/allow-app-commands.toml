@@ -9,6 +9,8 @@ commands.allow = [
   "prepare_oauth_callback",
   "wait_oauth_callback",
   "cancel_oauth_callback",
+  "open_oauth_authorize_window",
+  "close_oauth_authorize_window",
   "google_oauth_status",
   "google_oauth_begin",
   "google_oauth_complete",

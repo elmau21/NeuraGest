@@ -48,13 +48,13 @@ export function OAuthWaitingPanel({ phase, error, onCancel, onRetry }: Props) {
         <>
           <div className="auth-device-head">
             <span>Autoriza NeuraGest con Twitch</span>
-            <small>{phase === 'waiting' ? 'Se abrió tu navegador' : 'Preparando…'}</small>
+            <small>{phase === 'waiting' ? 'Ventana de acceso abierta' : 'Preparando…'}</small>
           </div>
 
           <p className="auth-device-copy">
             {phase === 'waiting'
-              ? 'Inicia sesión en Twitch y autoriza NeuraGest. Si el navegador abre Neura Awards en vez de volver aquí: cierra esa pestaña, deja una sola ventana de NeuraGest y reintenta.'
-              : 'Preparando el retorno seguro a la app. El navegador se abrirá en un momento.'}
+              ? 'Completa el acceso a Twitch en la ventana de NeuraGest (no en Arc/Chrome). Al autorizar, esa ventana se cierra sola.'
+              : 'Preparando el retorno seguro a la app. Se abrirá una ventana de acceso Twitch en un momento.'}
           </p>
 
           <div className="auth-device-actions">

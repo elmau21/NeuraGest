@@ -20,9 +20,9 @@ describe('humanizeInvokeError', () => {
     expect(humanizeInvokeError(new Error(msg))).toContain('Cierra otras ventanas')
   })
 
-  it('añade pista Awards / una sola ventana ante bad_oauth_state', () => {
+  it('añade pista de ventana NeuraGest ante bad_oauth_state', () => {
     expect(humanizeInvokeError(new Error('OAuth state not found or expired'))).toMatch(
-      /Neura Awards|una sola ventana/i,
+      /ventana de acceso de NeuraGest|v1\.0\.16/i,
     )
   })
 })

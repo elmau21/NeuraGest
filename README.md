@@ -74,13 +74,20 @@ redirigir **solo** al callback de Supabase; luego Supabase redirige a la app Tau
    «Esperando autorización…». Antes de reintentar: cierra pestañas de Awards y deja **una**
    sola ventana de NeuraGest.
 
-4. Ejecuta `npm run tauri:dev` y pulsa **Continuar con Twitch** **desde la app**.
-   No abras un link OAuth suelto ni el generador de tokens de la consola Twitch.
+4. Ejecuta `npm run tauri:dev` (o el instalador) y pulsa **Continuar con Twitch**
+   **desde la app**. NeuraGest abre una **ventana propia** (WebView) para Twitch —
+   no uses Arc/Chrome a mano ni el generador de tokens de la consola Twitch.
+   En la pantalla de acceso debe verse **v1.0.16+** abajo a la derecha.
 
-Flujo esperado:
+Flujo esperado (v1.0.16+):
 
-`App` → Supabase `/auth/v1/authorize` → Twitch (`redirect_uri` = callback Supabase) →
+`App` → ventana NeuraGest → Supabase `/auth/v1/authorize` → Twitch →
 Supabase → `http://127.0.0.1:14563/auth/callback` (listener local Tauri).
+
+**Por qué fallaba antes (v1.0.14/15):** abrir la URL con el navegador del sistema
+(Arc) compartía cookies OAuth con Awards y/o truncaba la query (`&`) en Windows,
+rompiendo PKCE (`code_challenge`) y el `state` de GoTrue. GoTrue respondía
+`bad_oauth_state` y redirigía el error al **Site URL** (Awards).
 
 El App Access Token para Helix público sigue usando `client_credentials` y no usa
 redirect. EventSub se registra por canal tras autenticar; Twitch entrega actividad

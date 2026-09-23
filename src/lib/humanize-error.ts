@@ -15,9 +15,9 @@ export function humanizeInvokeError(error: unknown): string {
   if (/bad_oauth_state|oauth state not found|enlace de acceso ya no es válido|retorno local|site url/i.test(raw)) {
     return (
       raw +
-      (raw.includes('Neura Awards')
+      (raw.includes('Neura Awards') || raw.includes('ventana de NeuraGest')
         ? ''
-        : ' Cierra pestañas de Neura Awards, usa una sola ventana de NeuraGest e inténtalo de nuevo.')
+        : ' Usa solo la ventana de acceso de NeuraGest (v1.0.16+); no completes el login en Arc/Chrome con Awards abierto.')
     )
   }
   return raw

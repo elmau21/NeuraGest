@@ -371,6 +371,8 @@ pub fn run() {
       commands::store_twitch_oauth_tokens,
 
       commands::oauth_callback::prepare_oauth_callback,
+      commands::oauth_callback::open_oauth_authorize_window,
+      commands::oauth_callback::close_oauth_authorize_window,
 
       commands::oauth_callback::wait_oauth_callback,
 

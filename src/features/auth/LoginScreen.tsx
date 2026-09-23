@@ -4,6 +4,7 @@ import { Radio } from '@/components/icons'
 import { OAuthWaitingPanel } from '@/features/auth/OAuthWaitingPanel'
 import { neuraliveLogotype } from '@/assets/brand'
 import { useAuthStore } from '@/stores/auth-store'
+import { getAppVersion } from '@/services/updater'
 import { isTauri } from '@/services/twitch'
 import { toastError } from '@/stores/toast-store'
 
@@ -104,6 +105,7 @@ export function LoginScreen() {
 
         <footer className="auth-footer">
           <span>NeuraLive · Gestión profesional de talentos</span>
+          <span className="auth-footer-version">v{getAppVersion()}</span>
         </footer>
       </motion.div>
     </div>

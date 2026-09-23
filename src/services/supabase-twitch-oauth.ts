@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core'
-import { open } from '@tauri-apps/plugin-shell'
 import type { Session, User } from '@supabase/supabase-js'
 import { humanizeInvokeError } from '@/lib/humanize-error'
 import { prepareDesktopAuthorizeUrl } from '@/services/oauth-authorize-url'
@@ -85,6 +84,15 @@ async function syncProviderTokens(session: Session, profile: SupabaseTwitchLogin
   })
 }
 
+async function closeOAuthAuthorizeWindow(): Promise<void> {
+  if (!isTauri) return
+  try {
+    await invoke('close_oauth_authorize_window')
+  } catch {
+    // Best-effort.
+  }
+}
+
 export async function cancelOAuthCallbackListener(): Promise<void> {
   if (!isTauri) return
   try {
@@ -95,7 +103,7 @@ export async function cancelOAuthCallbackListener(): Promise<void> {
 }
 
 export type SignInTwitchHooks = {
-  /** Fired only after the loopback listener is bound and the browser is opened. */
+  /** Fired only after the loopback listener is bound and the authorize window is opened. */
   onBrowserOpened?: () => void
 }
 
@@ -106,7 +114,7 @@ export async function signInWithSupabaseTwitch(
     throw new Error('Iniciar sesión con Twitch requiere la app de escritorio NeuraGest.')
   }
 
-  // 1) Bind loopback FIRST — never open the browser if this fails.
+  // 1) Bind loopback FIRST — never open authorize if this fails.
   const boundPort = await invoke<number>('prepare_oauth_callback', {
     preferredPort: OAUTH_CALLBACK_PORT,
     expectedPathPrefix: OAUTH_CALLBACK_PATH,
@@ -130,7 +138,7 @@ export async function signInWithSupabaseTwitch(
     throw new Error('No se recibió la URL para autorizar Twitch.')
   }
 
-  // 2) Fail closed: require redirect_to=loopback before opening anything.
+  // 2) Fail closed: require redirect_to=loopback + intact PKCE before opening anything.
   let authorizeUrl: string
   try {
     authorizeUrl = prepareDesktopAuthorizeUrl(data.url, redirectTo)
@@ -142,10 +150,12 @@ export async function signInWithSupabaseTwitch(
   try {
     // 3) Start accept BEFORE open so a fast redirect cannot race the listener.
     const callbackPromise = invoke<string>('wait_oauth_callback')
-    await open(authorizeUrl)
+    // Isolated webview — not the system browser (Arc/Awards) and not shell `open` (truncates & on Windows).
+    await invoke('open_oauth_authorize_window', { authorizeUrl })
     hooks?.onBrowserOpened?.()
 
     const callbackUrl = await callbackPromise
+    await closeOAuthAuthorizeWindow()
     const parsed = new URL(callbackUrl)
     const oauthError =
       parsed.searchParams.get('error_description') ??
@@ -168,6 +178,7 @@ export async function signInWithSupabaseTwitch(
     return profile
   } catch (error) {
     await cancelOAuthCallbackListener()
+    await closeOAuthAuthorizeWindow()
     throw new Error(humanizeInvokeError(error))
   }
 }

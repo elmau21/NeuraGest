@@ -217,8 +217,63 @@ pub async fn wait_oauth_callback() -> Result<String, String> {
     Ok(format!("http://127.0.0.1:{port}{path}"))
 }
 
+const OAUTH_AUTHORIZE_LABEL: &str = "oauth-twitch";
+
+fn close_oauth_authorize_window_for(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    if let Some(existing) = app.get_webview_window(OAUTH_AUTHORIZE_LABEL) {
+        let _ = existing.close();
+    }
+}
+
 #[tauri::command]
-pub async fn cancel_oauth_callback() -> Result<(), String> {
+pub async fn cancel_oauth_callback(app: tauri::AppHandle) -> Result<(), String> {
     release_oauth_listener().await;
+    close_oauth_authorize_window_for(&app);
+    Ok(())
+}
+
+/// Opens the Supabase/Twitch authorize URL inside an isolated NeuraGest webview.
+/// Avoids the system browser (Arc/Awards cookie jar) and Windows shell truncation of `&` in query strings.
+#[tauri::command]
+pub async fn open_oauth_authorize_window(
+    app: tauri::AppHandle,
+    authorize_url: String,
+) -> Result<(), String> {
+    use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+
+    let parsed = authorize_url
+        .parse::<url::Url>()
+        .map_err(|e| format!("URL de autorización inválida: {e}"))?;
+
+    if parsed.scheme() != "https" {
+        return Err("La URL de autorización debe ser HTTPS.".into());
+    }
+    let host = parsed.host_str().unwrap_or("");
+    if !host.ends_with(".supabase.co") || !parsed.path().contains("/authorize") {
+        return Err("La URL de autorización no apunta a Supabase Auth.".into());
+    }
+
+    if let Some(existing) = app.get_webview_window(OAUTH_AUTHORIZE_LABEL) {
+        let _ = existing.close();
+        // Brief pause so WebView2 releases the label before recreate.
+        tokio::time::sleep(Duration::from_millis(80)).await;
+    }
+
+    WebviewWindowBuilder::new(&app, OAUTH_AUTHORIZE_LABEL, WebviewUrl::External(parsed))
+        .title("NeuraGest · Acceso Twitch")
+        .inner_size(520.0, 780.0)
+        .min_inner_size(400.0, 560.0)
+        .resizable(true)
+        .focused(true)
+        .build()
+        .map_err(|e| format!("No se pudo abrir la ventana de acceso Twitch: {e}"))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn close_oauth_authorize_window(app: tauri::AppHandle) -> Result<(), String> {
+    close_oauth_authorize_window_for(&app);
     Ok(())
 }
