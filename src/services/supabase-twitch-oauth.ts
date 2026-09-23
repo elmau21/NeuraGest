@@ -7,7 +7,13 @@ import { isTauri } from '@/services/twitch'
 
 export const OAUTH_CALLBACK_PORT = 14563
 export const OAUTH_CALLBACK_PATH = '/auth/callback'
-export const OAUTH_REDIRECT_TO = `http://127.0.0.1:${OAUTH_CALLBACK_PORT}${OAUTH_CALLBACK_PATH}`
+
+export function oauthRedirectTo(port: number = OAUTH_CALLBACK_PORT): string {
+  return `http://127.0.0.1:${port}${OAUTH_CALLBACK_PATH}`
+}
+
+/** @deprecated Prefer oauthRedirectTo(boundPort) after prepare_oauth_callback. */
+export const OAUTH_REDIRECT_TO = oauthRedirectTo()
 
 export type SupabaseTwitchLoginResult = {
   login: string
@@ -78,24 +84,68 @@ async function syncProviderTokens(session: Session, profile: SupabaseTwitchLogin
   })
 }
 
+export async function cancelOAuthCallbackListener(): Promise<void> {
+  if (!isTauri) return
+  try {
+    await invoke('cancel_oauth_callback')
+  } catch {
+    // Best-effort: previous listener may already be gone.
+  }
+}
+
 export async function signInWithSupabaseTwitch(): Promise<SupabaseTwitchLoginResult> {
   if (!supabase || !isTauri) {
     throw new Error('Iniciar sesión con Twitch requiere la app de escritorio NeuraGest.')
   }
 
+  // 1) Bind loopback FIRST so redirect_to always matches a live listener.
+  const boundPort = await invoke<number>('prepare_oauth_callback', {
+    preferredPort: OAUTH_CALLBACK_PORT,
+    expectedPathPrefix: OAUTH_CALLBACK_PATH,
+  })
+  const redirectTo = oauthRedirectTo(boundPort)
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'twitch',
     options: {
-      redirectTo: OAUTH_REDIRECT_TO,
+      redirectTo,
       skipBrowserRedirect: true,
     },
   })
 
-  if (error) throw error
-  if (!data.url) throw new Error('No se recibió la URL para autorizar Twitch.')
+  if (error) {
+    await cancelOAuthCallbackListener()
+    throw error
+  }
+  if (!data.url) {
+    await cancelOAuthCallbackListener()
+    throw new Error('No se recibió la URL para autorizar Twitch.')
+  }
+
+  // Guard: authorize URL must carry our loopback redirect, not Site URL.
+  try {
+    const authorize = new URL(data.url)
+    const redirectParam =
+      authorize.searchParams.get('redirect_to') ??
+      authorize.searchParams.get('redirectTo')
+    if (redirectParam) {
+      const decoded = decodeURIComponent(redirectParam)
+      if (!decoded.startsWith(redirectTo)) {
+        await cancelOAuthCallbackListener()
+        throw new Error(
+          `La URL de autorización no usa el retorno local esperado (${redirectTo}).`,
+        )
+      }
+    }
+  } catch (parseError) {
+    if (parseError instanceof Error && parseError.message.includes('retorno local')) {
+      throw parseError
+    }
+    // Non-URL data.url — still try opening; exchange will fail clearly if wrong.
+  }
 
   try {
-    const callbackPromise = invoke<string>('wait_oauth_callback', { port: OAUTH_CALLBACK_PORT })
+    const callbackPromise = invoke<string>('wait_oauth_callback')
     await open(data.url)
 
     const callbackUrl = await callbackPromise
@@ -120,6 +170,7 @@ export async function signInWithSupabaseTwitch(): Promise<SupabaseTwitchLoginRes
     await syncProviderTokens(sessionData.session, profile)
     return profile
   } catch (error) {
+    await cancelOAuthCallbackListener()
     throw new Error(humanizeInvokeError(error))
   }
 }

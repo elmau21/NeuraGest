@@ -13,4 +13,10 @@ describe('humanizeInvokeError', () => {
       'Twitch no devolvió el código de autorización.',
     )
   })
+
+  it('conserva la pista de puerto ocupado / otras ventanas', () => {
+    const msg =
+      'No se pudo preparar el retorno de inicio de sesión en 127.0.0.1:14563: el puerto está ocupado. Cierra otras ventanas de NeuraGest'
+    expect(humanizeInvokeError(new Error(msg))).toContain('Cierra otras ventanas')
+  })
 })

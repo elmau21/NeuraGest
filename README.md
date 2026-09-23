@@ -9,7 +9,7 @@ Aplicación de escritorio de NeuraLive para gestionar talentos Twitch, operacion
 - Zustand, Recharts, TipTap, dnd-kit
 - Supabase PostgreSQL/Auth/Realtime/Storage con RLS
 - SQLite local en modo WAL para caché y cola de sincronización
-- Twitch OAuth Device Code Flow, Helix y almacenamiento seguro (Credential Manager / libsecret)
+- Twitch OAuth vía Supabase Auth (callback local Tauri), Helix y almacenamiento seguro (Credential Manager / libsecret)
 
 ## Requisitos Windows
 
@@ -42,24 +42,40 @@ No incluyas secretos en variables `VITE_*`: Vite las publica en el bundle.
 
 La migración incluye UUID/FK, índices, borrado lógico, versionado, triggers, RLS por organización/rol, Realtime, RPC `dashboard_metrics` y la vista materializada `talent_daily_metrics`.
 
-### Twitch
+### Twitch (login de usuario vía Supabase Auth)
 
-1. En [Twitch Developer Console](https://dev.twitch.tv/console/apps), pulsa **Register Your Application**. Usa un nombre único, selecciona una categoría (por ejemplo, **Application Integration**) y, si aparece **Client Type**, elige **Confidential**. Pega exactamente esta única OAuth Redirect URL y pulsa **Add** para incorporarla antes de crear la aplicación:
+El login de escritorio usa `signInWithOAuth({ provider: 'twitch' })`. Twitch debe
+redirigir **solo** al callback de Supabase; luego Supabase redirige a la app Tauri.
 
-   `https://localhost/oauth/callback`
+1. En [Twitch Developer Console](https://dev.twitch.tv/console/apps), registra la app
+   (categoría p. ej. **Application Integration**; **Client Type** = **Confidential** si aparece).
+   En **OAuth Redirect URLs** deja **únicamente**:
 
-2. Guarda la aplicación, copia el **Client ID** y pulsa **New Secret**. Completa `.env` sin comillas:
+   `https://ehxnggopzftiolgapcav.supabase.co/auth/v1/callback`
 
-   ```dotenv
-   TWITCH_CLIENT_ID=tu_client_id
-   TWITCH_CLIENT_SECRET=tu_client_secret
-   ```
+   No uses `https://localhost/oauth/callback` (basura de docs antiguas; provoca
+   `redirect_mismatch` y `ERR_CONNECTION_REFUSED`).
 
-3. Ejecuta `npm run tauri:dev` y pulsa **Conectar cuenta Twitch**. NeuraGest abrirá `twitch.tv/activate`, esperará la autorización y guardará los tokens en Windows Credential Manager.
+2. Copia el **Client ID**, crea un **New Secret** y pégalos en:
+   - `.env` → `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` (Helix / backend Tauri)
+   - Supabase Dashboard → **Authentication** → **Providers** → **Twitch** (mismo Client ID/Secret;
+     activa el provider)
 
-La URI HTTPS anterior satisface el formulario de Twitch, pero NeuraGest no recibe tráfico en ella: la autenticación de usuario usa el Device Code Flow oficial y no requiere callback ni servidor local. El App Access Token para las consultas públicas de Helix sigue usando `client_credentials`; este flujo tampoco usa la URI de redirección.
+3. En Supabase → **Authentication** → **URL Configuration**, incluye en Redirect URLs:
 
-Los scopes de subs/followers dependen de que la cuenta autenticada tenga permisos en los canales. EventSub debe registrar suscripciones por canal tras conectar la cuenta; Twitch entrega actividad por WebSocket y Helix se usa para enriquecimiento.
+   `http://127.0.0.1:14563/auth/callback`
+
+4. Ejecuta `npm run tauri:dev` y pulsa **Continuar con Twitch** **desde la app**.
+   No abras un link OAuth suelto ni el generador de tokens de la consola Twitch.
+
+Flujo esperado:
+
+`App` → Supabase `/auth/v1/authorize` → Twitch (`redirect_uri` = callback Supabase) →
+Supabase → `http://127.0.0.1:14563/auth/callback` (listener local Tauri).
+
+El App Access Token para Helix público sigue usando `client_credentials` y no usa
+redirect. EventSub se registra por canal tras autenticar; Twitch entrega actividad
+por WebSocket y Helix se usa para enriquecimiento.
 
 ## Desarrollo y pruebas
 

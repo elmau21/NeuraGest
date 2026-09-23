@@ -7,5 +7,10 @@ export function humanizeInvokeError(error: unknown): string {
   if (/connection refused|failed to fetch|networkerror/i.test(raw)) {
     return 'No hay conexión con el servicio. Comprueba tu red e inténtalo de nuevo.'
   }
+  if (/puerto está ocupado|os error 10048|addrinuse|address already in use/i.test(raw)) {
+    return raw.includes('Cierra otras ventanas')
+      ? raw
+      : `${raw} Cierra otras ventanas de NeuraGest e inténtalo de nuevo.`
+  }
   return raw
 }

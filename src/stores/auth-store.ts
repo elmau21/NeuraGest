@@ -7,6 +7,7 @@ import {
   type AppRole,
 } from '@/services/app-users'
 import {
+  cancelOAuthCallbackListener,
   getActiveSupabaseTwitchProfile,
   signInWithSupabaseTwitch,
   signOutSupabase,
@@ -49,6 +50,9 @@ type AuthState = {
   cancelOAuthFlow: () => void
   logout: () => Promise<void>
 }
+
+/** Monotonic id so a cancelled/retried login cannot overwrite a newer attempt. */
+let oauthAttemptId = 0
 
 function profileToSession(profile: SupabaseTwitchLoginResult | TwitchUserProfile | TwitchAuthState, authUserId?: string): TwitchSession | null {
   if ('authUserId' in profile && profile.authUserId) {
@@ -200,13 +204,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ error: 'Usa la app de escritorio NeuraGest para iniciar sesión con Twitch.' })
       return
     }
+    const attempt = ++oauthAttemptId
+    await cancelOAuthCallbackListener()
     set({ oauthFlow: 'opening', error: null })
     try {
       set({ oauthFlow: 'waiting' })
       const profile = await signInWithSupabaseTwitch()
+      if (attempt !== oauthAttemptId) return
       const session = profileToSession(profile)
       if (!session) throw new Error('Twitch no devolvió un perfil válido.')
       const identity = await loadRolesAndIdentity(session)
+      if (attempt !== oauthAttemptId) return
       set({
         status: 'authenticated',
         session,
@@ -216,15 +224,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       })
       void logAuthActivity('login')
     } catch (error) {
+      await cancelOAuthCallbackListener()
+      if (attempt !== oauthAttemptId) return
+      const message = humanizeInvokeError(error)
+      if (/inicio de sesión cancelado/i.test(message)) {
+        set({ oauthFlow: 'idle', error: null })
+        return
+      }
       set({
         oauthFlow: 'error',
-        error: humanizeInvokeError(error),
+        error: message,
       })
     }
   },
 
   cancelOAuthFlow: () => {
-    if (get().oauthFlow === 'waiting') return
+    oauthAttemptId += 1
+    void cancelOAuthCallbackListener()
     set({ oauthFlow: 'idle', error: null })
   },
 

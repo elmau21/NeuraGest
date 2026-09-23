@@ -370,7 +370,11 @@ pub fn run() {
 
       commands::store_twitch_oauth_tokens,
 
+      commands::oauth_callback::prepare_oauth_callback,
+
       commands::oauth_callback::wait_oauth_callback,
+
+      commands::oauth_callback::cancel_oauth_callback,
 
       commands::google_calendar::google_oauth_status,
 
