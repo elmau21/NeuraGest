@@ -90,7 +90,7 @@ export function WarRoomPage() {
           <div className="vision-stat-body">
             <span>Tiempo real</span>
             <strong>{eventSub?.state === 'connected' ? 'Conectado' : eventSub?.state === 'connecting' ? 'Conectando' : eventSub?.state === 'fallback_polling' ? 'Modo alterno' : 'Desconectado'}</strong>
-            <em>EventSub / polling</em>
+            <em>Sync de red</em>
           </div>
         </article>
       </div>
@@ -98,7 +98,7 @@ export function WarRoomPage() {
       <ActiveUsersPanel />
 
       <p className="integration-note">
-        Twitch: {helixStatus === 'connected' ? 'conectado' : helixStatus === 'connecting' ? 'conectando' : helixStatus === 'error' ? 'error' : 'pendiente'}
+        Sync de red: {helixStatus === 'connected' ? 'activo' : helixStatus === 'connecting' ? 'sincronizando' : helixStatus === 'error' ? 'interrumpido' : 'pendiente'}
         {lastUpdate ? ` · ${new Date(lastUpdate).toLocaleTimeString('es-MX')}` : ''}
         · Capturas 6h: {snapshots.filter((s) => s.isLive).length} en vivo
       </p>
@@ -106,8 +106,8 @@ export function WarRoomPage() {
       {liveTalents.length === 0 ? (
         <div className="card ops-empty-noc">
           <Radio size={32} />
-          <b>Ningún talento en directo</b>
-          <span>El mosaico se llenará automáticamente cuando se detecten streams en Twitch.</span>
+          <b>Ningún talento al aire</b>
+          <span>El mosaico se llena solo cuando la cartera entra en señal.</span>
         </div>
       ) : (
         <>

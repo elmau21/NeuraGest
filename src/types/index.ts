@@ -15,6 +15,12 @@ export type Talent = {
   createdAt: string
   streamId?: string
   startedAt?: string
+  /** Tags Helix del canal. */
+  tags?: string[]
+  /** Idioma del broadcast. */
+  language?: string
+  /** Content Classification Labels. */
+  contentClassificationLabels?: string[]
 }
 
 export type TaskStatus = 'backlog' | 'progress' | 'review' | 'done'

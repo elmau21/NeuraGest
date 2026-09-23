@@ -81,7 +81,7 @@ export async function fetchTwitchTrackerSyncStatus(): Promise<TwitchTrackerSyncS
 }
 
 export const TWITCHTRACKER_DISCLAIMER =
-  'Resúmenes históricos externos (~30 días por canal). Datos agregados de la plataforma.'
+  'Inteligencia de audiencia recopilada por el equipo de Data de NeuraLive.'
 
 /** Endpoint verificado: resumen rolling ~30 días por login exacto de Twitch. */
 export const TWITCHTRACKER_SUMMARY_ENDPOINT = '/api/channels/summary/{login}'

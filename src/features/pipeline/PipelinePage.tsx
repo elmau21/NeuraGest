@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core'
 import { ExternalLink, LayoutGrid, List, Plus, RefreshCw } from '@/components/icons'
+import { EmptyState } from '@/components/EmptyState'
 import {
   CONTENT_TYPE_LABELS,
   deletePipelineItem,
@@ -192,7 +193,18 @@ export function PipelinePage() {
 
       {error && <p className="integration-note">{error}</p>}
 
-      {view === 'kanban' ? (
+      {!loading && items.length === 0 ? (
+        <EmptyState
+          className="agency-board-empty"
+          icon={LayoutGrid}
+          title="Pipeline vacío"
+          description="Registra clips, VODs o entregas creativas para moverlos por idea → producción → publicado."
+        >
+          <button className="primary" onClick={openNew}>
+            <Plus size={16} /> Nuevo ítem
+          </button>
+        </EmptyState>
+      ) : view === 'kanban' ? (
         <DndContext onDragEnd={onDragEnd}>
           <div className="board agency-board">
             {PIPELINE_COLUMNS.map((column) => (
@@ -218,7 +230,6 @@ export function PipelinePage() {
                 {item.url && <ExternalLink size={14} />}
               </button>
             ))}
-            {!loading && items.length === 0 && <p className="empty-state">No hay ítems en el pipeline.</p>}
           </div>
         </div>
       )}

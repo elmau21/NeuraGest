@@ -4,6 +4,8 @@ mod db;
 
 mod twitch;
 
+mod vrchat;
+
 
 
 use std::net::TcpListener;
@@ -278,7 +280,7 @@ pub fn run() {
 
   Box::leak(Box::new(guard));
 
-  tracing_subscriber::fmt().with_writer(writer).with_env_filter("neuragest=info,warn").init();
+  tracing_subscriber::fmt().with_writer(writer).with_env_filter("neuragest=info,neuragest_lib=info,warn").init();
 
 
 
@@ -333,6 +335,10 @@ pub fn run() {
               "Refresco Helix inicial completado"
 
             );
+
+            use tauri::Emitter;
+
+            let _ = app_handle.emit("talents-updated", &talents);
 
           }
 
@@ -389,6 +395,28 @@ pub fn run() {
       commands::fetch_stream_events,
 
       commands::eventsub_status,
+
+      commands::fetch_channel_info,
+
+      commands::create_twitch_clip,
+
+      commands::fetch_subscription_kpi,
+
+      commands::fetch_portfolio_subscription_kpi,
+
+      commands::save_report_export,
+
+      commands::reveal_downloads_dir,
+
+      commands::open_report_preview,
+
+      commands::fetch_chatters_count,
+
+      commands::fetch_ads_schedule,
+
+      commands::fetch_creator_goals,
+
+      commands::fetch_live_extras,
 
       commands::fetch_weekly_clips,
 
@@ -503,6 +531,14 @@ pub fn run() {
       commands::discord_rpc::discord_rpc_clear,
 
       commands::open_twitch_channel_window,
+
+      commands::vrchat_config_status,
+
+      commands::sync_vrchat_group,
+
+      commands::verify_vrchat_2fa,
+
+      commands::fetch_vrchat_group_snapshots,
 
     ])
 

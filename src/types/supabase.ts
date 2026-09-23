@@ -867,6 +867,122 @@ export type Database = {
           },
         ]
       }
+      instagram_monthly_snapshots: {
+        Row: {
+          followers: number
+          following: number | null
+          id: number
+          instagram_handle: string
+          login: string | null
+          media_count: number | null
+          organization_id: string
+          raw_payload: Json | null
+          snapshot_month: string
+          source: string
+          synced_at: string
+          talent_id: string | null
+          views: number | null
+          views_available: boolean
+        }
+        Insert: {
+          followers?: number
+          following?: number | null
+          id?: never
+          instagram_handle: string
+          login?: string | null
+          media_count?: number | null
+          organization_id: string
+          raw_payload?: Json | null
+          snapshot_month: string
+          source?: string
+          synced_at?: string
+          talent_id?: string | null
+          views?: number | null
+          views_available?: boolean
+        }
+        Update: {
+          followers?: number
+          following?: number | null
+          id?: never
+          instagram_handle?: string
+          login?: string | null
+          media_count?: number | null
+          organization_id?: string
+          raw_payload?: Json | null
+          snapshot_month?: string
+          source?: string
+          synced_at?: string
+          talent_id?: string | null
+          views?: number | null
+          views_available?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_monthly_snapshots_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instagram_monthly_snapshots_talent_id_fkey"
+            columns: ["talent_id"]
+            isOneToOne: false
+            referencedRelation: "talents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vrchat_group_snapshots: {
+        Row: {
+          discriminator: string | null
+          group_id: string
+          icon_url: string | null
+          id: number
+          member_count: number
+          name: string
+          online_member_count: number
+          organization_id: string
+          raw_payload: Json | null
+          short_code: string | null
+          synced_at: string
+        }
+        Insert: {
+          discriminator?: string | null
+          group_id: string
+          icon_url?: string | null
+          id?: never
+          member_count?: number
+          name?: string
+          online_member_count?: number
+          organization_id: string
+          raw_payload?: Json | null
+          short_code?: string | null
+          synced_at?: string
+        }
+        Update: {
+          discriminator?: string | null
+          group_id?: string
+          icon_url?: string | null
+          id?: never
+          member_count?: number
+          name?: string
+          online_member_count?: number
+          organization_id?: string
+          raw_payload?: Json | null
+          short_code?: string | null
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vrchat_group_snapshots_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body: string | null

@@ -13,7 +13,9 @@ insert into public.talents(organization_id,login,display_name,description) value
 ('00000000-0000-0000-0000-000000000001','shisuvr','Shisu VR','Talento NeuraLive'),
 ('00000000-0000-0000-0000-000000000001','bhikoruvt','Bhikoru VT','Talento NeuraLive'),
 ('00000000-0000-0000-0000-000000000001','ashitakaseiren','Ashitaka Seiren','Talento NeuraLive'),
-('00000000-0000-0000-0000-000000000001','cold__vt','Cold VT','Talento NeuraLive')
+('00000000-0000-0000-0000-000000000001','cold__vt','Cold VT','Talento NeuraLive'),
+('00000000-0000-0000-0000-000000000001','yosoyastra','yosoyastra','Talento NeuraLive'),
+('00000000-0000-0000-0000-000000000001','niel','Niel','Talento NeuraLive')
 on conflict(organization_id,login) do update set display_name=excluded.display_name;
 
 insert into public.spaces(organization_id,name,position)

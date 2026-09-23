@@ -3,6 +3,43 @@ export type ActivityActor = {
   twitch_login?: string | null
 } | null
 
+/** Labels legibles (ES) para tipos EventSub / Helix en UI. La key cruda puede ir en title/tooltip. */
+const EVENTSUB_TYPE_LABELS: Record<string, string> = {
+  'stream.online': 'En vivo',
+  'stream.offline': 'Offline',
+  'channel.update': 'Actualización',
+  'channel.follow': 'Follow',
+  'channel.subscribe': 'Sub',
+  'channel.subscription.gift': 'Sub',
+  'channel.subscription.message': 'Sub',
+  'channel.subscription.end': 'Sub',
+  'channel.cheer': 'Bits',
+  'channel.raid': 'Raid',
+  'channel.shared_chat.begin': 'Shared chat',
+  'channel.shared_chat.update': 'Shared chat',
+  'channel.shared_chat.end': 'Shared chat',
+}
+
+export function formatEventSubTypeLabel(eventType: string): string {
+  const key = eventType.trim()
+  if (!key) return 'Evento'
+  const exact = EVENTSUB_TYPE_LABELS[key]
+  if (exact) return exact
+  if (key.startsWith('channel.subscribe') || key.startsWith('channel.subscription')) return 'Sub'
+  if (key.startsWith('channel.shared_chat')) return 'Shared chat'
+  if (key.startsWith('channel.raid')) return 'Raid'
+  if (key.startsWith('stream.')) {
+    const rest = key.slice('stream.'.length).replace(/[._]/g, ' ')
+    return rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : 'Stream'
+  }
+  if (key.startsWith('channel.')) {
+    const rest = key.slice('channel.'.length).replace(/[._]/g, ' ')
+    return rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : 'Canal'
+  }
+  // Evitar keys técnicas en UI; la cruda queda en title/tooltip.
+  return 'Evento'
+}
+
 export function resolveActorName(
   actor?: ActivityActor,
   metadata?: Record<string, unknown> | null,

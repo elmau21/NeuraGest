@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<title>Verify Señal Pulse PDF capture</title>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@4.2.1/dist/jspdf.umd.min.js"></script>
+<style>
+  :root { --bg:#09090b; --panel:#18181b; --line:#27272a; --text:#fafafa; --muted:#a1a1aa; --text3:#71717a; --accent:#e12ec4; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Segoe UI",system-ui,sans-serif; background:#111; color:#fff; }
+  #status { padding:12px 16px; font:14px/1.4 Consolas,monospace; white-space:pre-wrap; }
+  .sheet { max-width:1180px; margin:0 auto; padding:28px 24px 40px; background:var(--bg); color:var(--text); }
+  header { display:flex; gap:28px; border-bottom:1px solid var(--line); padding-bottom:20px; margin-bottom:22px; }
+  h1 { margin:0; font-size:28px; }
+  .product { color:var(--accent); font-size:12px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; }
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .kpi { background:var(--panel); border:1px solid var(--line); padding:12px; }
+  .kpi span { display:block; color:var(--text3); font-size:10px; text-transform:uppercase; }
+  .kpi strong { display:block; margin-top:6px; font-size:20px; color:var(--text); }
+</style>
+</head>
+<body>
+<div id="status">Preparando captura…</div>
+<script>
+async function run() {
+  const status = document.getElementById('status')
+  const log = (m) => { status.textContent += '\n' + m }
+
+  // Montaje ON-SCREEN (fix): left:0, z-index alto — no left:-14000 / z-index:-1
+  const host = document.createElement('div')
+  host.style.cssText = 'position:fixed;left:0;top:0;width:1180px;background:#09090b;color:#fafafa;z-index:2147483646;opacity:1;pointer-events:none'
+  host.innerHTML = `
+    <div class="sheet">
+      <header>
+        <div>
+          <p class="product">Señal Pulse</p>
+          <h1>NeuraLive</h1>
+          <p style="color:#a1a1aa;font-size:13px">Verificación PDF · Graphite</p>
+        </div>
+      </header>
+      <div class="kpis">
+        <div class="kpi"><span>Followers</span><strong>12,400</strong></div>
+        <div class="kpi"><span>Avg viewers</span><strong>860</strong></div>
+        <div class="kpi"><span>Hours watched</span><strong>4,200</strong></div>
+        <div class="kpi"><span>Actividad 7d</span><strong>75%</strong></div>
+      </div>
+      <svg width="120" height="120" style="margin-top:16px" aria-hidden="true">
+        <circle cx="60" cy="60" r="42" fill="none" stroke="#27272a" stroke-width="10"/>
+        <circle cx="60" cy="60" r="42" fill="none" stroke="#e12ec4" stroke-width="10"
+          stroke-dasharray="198 66" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
+      </svg>
+    </div>`
+  document.body.appendChild(host)
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+
+  const canvas = await html2canvas(host, {
+    backgroundColor: '#09090b',
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    scrollX: 0,
+    scrollY: -window.scrollY,
+    windowWidth: 1180,
+    width: 1180,
+  })
+
+  // Probe luminancia (mismo guardrail que la app)
+  const ctx = canvas.getContext('2d')
+  const y = Math.min(160, canvas.height - 8)
+  const h = Math.min(48, canvas.height - y)
+  const data = ctx.getImageData(0, y, canvas.width, h).data
+  let bright = 0
+  for (let i = 0; i < data.length; i += 32) {
+    const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
+    if (lum > 35) bright++
+  }
+  const ok = bright >= 12
+  log(`canvas ${canvas.width}x${canvas.height}`)
+  log(`píxeles claros en franja: ${bright} → ${ok ? 'OK contenido visible' : 'FAIL negro vacío'}`)
+
+  if (!ok) {
+    host.remove()
+    document.body.dataset.verify = 'fail'
+    return
+  }
+
+  const { jsPDF } = window.jspdf
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true })
+  const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
+  const margin = 4
+  const contentW = pageW - margin * 2
+  const imgH = (canvas.height * contentW) / canvas.width
+  doc.setFillColor(9, 9, 11)
+  doc.rect(0, 0, pageW, pageH, 'F')
+  doc.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, contentW, Math.min(imgH, pageH - margin * 2))
+  const pages = doc.getNumberOfPages()
+  log(`páginas PDF: ${pages}`)
+  log(`altura imagen mm: ${imgH.toFixed(1)}`)
+
+  const out = 'c:/Users/IGNITER/NeuraGest/scripts/verify-senal-pulse-out.pdf'
+  // En file:// no podemos escribir disco; descargamos + marcamos OK
+  doc.save('verify-senal-pulse-out.pdf')
+  document.body.dataset.verify = 'ok'
+  document.body.dataset.pages = String(pages)
+  document.body.dataset.bright = String(bright)
+  host.remove()
+  log('PDF descargado: verify-senal-pulse-out.pdf')
+  log('VERIFY_OK')
+}
+
+run().catch((e) => {
+  document.getElementById('status').textContent = 'ERROR: ' + e
+  document.body.dataset.verify = 'error'
+})
+</script>
+</body>
+</html>

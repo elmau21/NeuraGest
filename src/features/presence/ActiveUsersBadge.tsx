@@ -45,6 +45,8 @@ const PAGE_LABELS: Record<string, string> = {
   '/ciencia-datos': 'Ciencia de datos',
   '/estadisticas': 'Estadísticas',
   '/analitica': 'Analítica',
+  '/senal': 'Señal Pulse',
+  '/senal/coordinacion': 'Coordinación',
   '/auditoria': 'Auditoría',
   '/ajustes': 'Ajustes',
 }

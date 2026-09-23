@@ -109,20 +109,20 @@ export function PermissionsPanel({ compact = false, hideRoles = [] }: Permission
       return
     }
 
-    const isProtected = user.twitchLogin.toLowerCase() === 'maufuwari'
+    const isProtected = user.twitchLogin.toLowerCase() === 'elmauwiii'
     const losingAdmin = isProtected && hasRole && (role === 'owner' || role === 'dev')
     let confirmProtected = false
     if (losingAdmin) {
       if (!canAssignOwner && role === 'owner') {
-        toastError('No puedes degradar el owner de MauFuwari')
+        toastError('No puedes degradar el owner de elmauwiii')
         return
       }
       if (!canStrong) {
-        toastError('No puedes degradar roles owner/dev de MauFuwari')
+        toastError('No puedes degradar roles owner/dev de elmauwiii')
         return
       }
       const ok = window.confirm(
-        'MauFuwari perderá privilegios owner/dev. ¿Confirmas esta degradación?',
+        'elmauwiii perderá privilegios owner/dev. ¿Confirmas esta degradación?',
       )
       if (!ok) return
       confirmProtected = true

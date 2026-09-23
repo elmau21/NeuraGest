@@ -49,6 +49,19 @@ export function useMetricHistory(hours = 168) {
     void reload()
   }, [reload, lastTwitchUpdate])
 
+  // EventSub cambia en Rust sin tocar Helix: refrescar estado cada 5s.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const id = window.setInterval(() => {
+      void fetchEventSubStatus()
+        .then((status) => {
+          if (status) setEventSub(status)
+        })
+        .catch(() => undefined)
+    }, 5_000)
+    return () => window.clearInterval(id)
+  }, [])
+
   const weekly = buildWeeklyComparison(snapshots, displayNames)
   const streaks = buildStreakIndicators(snapshots, events, displayNames)
 

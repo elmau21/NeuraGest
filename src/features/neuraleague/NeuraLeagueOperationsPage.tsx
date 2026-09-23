@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, RefreshCw } from '@/components/icons'
+import { Megaphone, Plus, RefreshCw, ListTodo } from '@/components/icons'
+import { EmptyState } from '@/components/EmptyState'
 import {
   listAnnouncements,
   listLeagueTasks,
@@ -125,7 +126,17 @@ export function NeuraLeagueOperationsPage() {
                   )}
                 </li>
               ))}
-              {tasks.length === 0 && <li><span>Sin tareas</span></li>}
+              {tasks.length === 0 && (
+                <li>
+                  <EmptyState
+                    icon={ListTodo}
+                    title="Sin tareas de operación"
+                    description={readonly
+                      ? 'Cuando el staff publique tareas de scrim, VOD o checklist, aparecerán aquí.'
+                      : 'Crea la primera tarea arriba (scrim, VOD, checklist) para coordinar al equipo.'}
+                  />
+                </li>
+              )}
             </ul>
           </div>
 
@@ -149,7 +160,17 @@ export function NeuraLeagueOperationsPage() {
                   <span>{new Date(a.publishedAt).toLocaleString('es-MX')} · {a.body.slice(0, 120)}</span>
                 </li>
               ))}
-              {announcements.length === 0 && <li><span>Sin anuncios</span></li>}
+              {announcements.length === 0 && (
+                <li>
+                  <EmptyState
+                    icon={Megaphone}
+                    title="Sin anuncios internos"
+                    description={readonly
+                      ? 'Los avisos del staff de liga se listarán aquí.'
+                      : 'Publica un aviso para el equipo (reglas, horarios, recordatorios).'}
+                  />
+                </li>
+              )}
             </ul>
           </div>
         </div>

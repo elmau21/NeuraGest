@@ -2441,6 +2441,7 @@ dependencies = [
 name = "neuragest"
 version = "1.0.10"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "discord-rich-presence",
  "dotenvy",

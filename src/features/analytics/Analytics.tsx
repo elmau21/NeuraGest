@@ -230,6 +230,7 @@ export function Analytics() {
       <p className={`an-eventsub ${eventSub.state}`}>
         Tiempo real: {eventSub.state === 'connected' ? 'conectado' : eventSub.state === 'connecting' ? 'conectando' : eventSub.state === 'fallback_polling' ? 'modo alterno' : 'desconectado'} · {eventSub.subscriptions} suscripciones activas
         {eventSub.lastEventAt && ` · último evento ${new Date(eventSub.lastEventAt).toLocaleString('es-MX')}`}
+        {eventSub.lastError && eventSub.state !== 'connected' ? ` · ${eventSub.lastError}` : ''}
       </p>
     )}
 
@@ -268,7 +269,7 @@ export function Analytics() {
     {tab === 'summary' && <div className="an-tab-content">
       <section className="bi-kpi-strip an-metrics">
         <MetricCard tone="live" label="En directo" value={`${liveTalents.length}/${talents.length}`} detail={`${talents.length - liveTalents.length} offline`} icon={Radio} />
-        <MetricCard tone="purple" label="Audiencia live" value={analyticsNumber.format(totalLiveViewers)} detail="Viewers simultáneos" icon={Eye} />
+        <MetricCard tone="accent" label="Audiencia live" value={analyticsNumber.format(totalLiveViewers)} detail="Viewers simultáneos" icon={Eye} />
         <MetricCard tone="blue" label="Followers" value={analyticsNumber.format(totalFollowers)} detail="Suma actual de cartera" icon={Users} />
         <MetricCard tone="amber" label="Líder actual" value={leader?.displayName ?? 'Sin live'} detail={leader ? `${analyticsNumber.format(leader.viewers)} viewers` : 'Sin emisiones activas'} icon={Trophy} />
       </section>

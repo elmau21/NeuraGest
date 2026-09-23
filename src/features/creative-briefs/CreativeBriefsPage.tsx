@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   CalendarDays,
   Check,
@@ -9,6 +9,7 @@ import {
   Sparkles,
   Trash2,
 } from '@/components/icons'
+import { EmptyState } from '@/components/EmptyState'
 import { listDbTalents, listSponsorshipDeals, type DbTalent, type SponsorshipDeal } from '@/services/agency'
 import { listCalendarEventsOps } from '@/services/ops'
 import {
@@ -198,9 +199,15 @@ export function CreativeBriefsPage() {
         <section className="card dg-briefs-side">
           <h3><CalendarDays size={15} /> Próximos briefs</h3>
           {loading ? (
-            <p className="empty-state">Cargando agenda…</p>
+            <p className="empty-state is-loading">Cargando agenda…</p>
           ) : upcoming.length === 0 ? (
-            <p className="empty-state">No hay streams próximos en el calendario.</p>
+            <EmptyState
+              icon={CalendarDays}
+              title="Sin streams próximos"
+              description="Agenda un stream o collab en el calendario para generar briefs creativos desde aquí."
+            >
+              <Link to="/calendario" className="secondary">Ir al calendario</Link>
+            </EmptyState>
           ) : (
             <ul className="dg-upcoming-list">
               {upcoming.map((ev) => {
@@ -238,7 +245,11 @@ export function CreativeBriefsPage() {
 
           <h3 className="dg-briefs-saved-title"><ClipboardList size={15} /> Guardados</h3>
           {briefs.length === 0 ? (
-            <p className="empty-state">Aún no hay briefs creativos.</p>
+            <EmptyState
+              icon={ClipboardList}
+              title="Sin briefs guardados"
+              description="Genera un brief desde un stream próximo o crea uno manual cuando tengas agenda."
+            />
           ) : (
             <ul className="dg-brief-list">
               {briefs.map((b) => (

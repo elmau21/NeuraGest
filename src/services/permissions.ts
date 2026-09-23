@@ -26,6 +26,7 @@ export const CONTROL_CENTER_ALIAS_PATH = '/asistente'
 
 /** Rutas del bloque «Datos» (sidebar + guard de URL). */
 export const DATOS_PATHS = [
+  '/senal',
   '/inteligencia',
   '/ciencia-datos',
   '/ml',
@@ -39,6 +40,7 @@ export const DATOS_NAV_ROLES: AppRole[] = ['owner', 'dev', 'assistant']
 
 /** Rutas de datos permitidas para un usuario solo-`dev`. */
 export const DEV_ALLOWED_PATHS = [
+  '/senal',
   '/inteligencia',
   '/ciencia-datos',
   '/ml',
@@ -62,13 +64,13 @@ export const LEAGUE_ALLOWED_PATHS = ['/neuralleague', '/war-room', '/ajustes'] a
 export const LEAGUE_DEFAULT_PATH = '/war-room'
 
 export function canMutate(roles: AppRole[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
+  if (login?.toLowerCase() === 'elmauwiii') return true
   return roles.some((role) => MUTATE_ROLES.includes(role))
 }
 
 /** Mutaciones solo-admin/owner (secretos Helix, CRM crítico, etc.). */
 export function canAdminMutate(roles: AppRole[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
+  if (login?.toLowerCase() === 'elmauwiii') return true
   return roles.some((role) => ADMIN_MUTATE_ROLES.includes(role))
 }
 
@@ -76,7 +78,7 @@ export function canAdminMutate(roles: AppRole[], login?: string | null): boolean
 export const DOCUMENT_DRIVE_FOLDER_ROLES: AppRole[] = ['owner', 'assistant', 'league_manager']
 
 export function canCreateDocumentDriveFolder(roles: AppRole[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
+  if (login?.toLowerCase() === 'elmauwiii') return true
   return roles.some((role) => DOCUMENT_DRIVE_FOLDER_ROLES.includes(role))
 }
 
@@ -84,19 +86,19 @@ export function canCreateDocumentDriveFolder(roles: AppRole[], login?: string | 
 export const CONTRATOS_ACCESS_ROLES: AppRole[] = DOCUMENT_DRIVE_FOLDER_ROLES
 
 export function canAccessContratos(roles: AppRole[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
+  if (login?.toLowerCase() === 'elmauwiii') return true
   return roles.some((role) => CONTRATOS_ACCESS_ROLES.includes(role))
 }
 
 /** Escritura en Drive creativo, briefs y huecos de canal. */
 export function canMutateDesign(roles: AppRole[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
+  if (login?.toLowerCase() === 'elmauwiii') return true
   return roles.some((role) => DESIGN_MUTATE_ROLES.includes(role))
 }
 
 /** Escritura en NeuraLeague (estructura, stats, VODs, reclutamiento, operación). */
 export function canMutateLeague(roles: AppRole[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
+  if (login?.toLowerCase() === 'elmauwiii') return true
   return roles.some((role) => LEAGUE_MUTATE_ROLES.includes(role))
 }
 
@@ -118,12 +120,12 @@ export function hasAnyLeagueRole(roles: AppRole[]): boolean {
 
 /** True si el usuario tiene un rol con menú completo (owner gana sobre dev/designer/liga). */
 export function hasFullNavAccess(roles: AppRole[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
+  if (login?.toLowerCase() === 'elmauwiii') return true
   return roles.some((role) => FULL_NAV_ROLES.includes(role))
 }
 
 export function canAccessControlCenter(roles: AppRole[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
+  if (login?.toLowerCase() === 'elmauwiii') return true
   return roles.some((role) => CONTROL_CENTER_ROLES.includes(role))
 }
 
@@ -132,7 +134,7 @@ export const STRONG_APP_ROLES: AppRole[] = ['owner', 'dev']
 
 /** Panel de permisos / listado de usuarios (owner, dev, assistant). */
 export function canManageAppRoles(roles: AppRole[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
+  if (login?.toLowerCase() === 'elmauwiii') return true
   return roles.some((role) => ROLE_MANAGER_ROLES.includes(role))
 }
 
@@ -141,17 +143,17 @@ export function canManageAppRoles(roles: AppRole[], login?: string | null): bool
  * Assistant puede gestionar roles operativos, pero no estos.
  */
 export function canAssignStrongRoles(roles: AppRole[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
+  if (login?.toLowerCase() === 'elmauwiii') return true
   return roles.includes('owner') || roles.includes('dev')
 }
 
-/** Solo un owner (o MauFuwari) puede asignar/quitar el rol owner. */
+/** Solo un owner (o elmauwiii) puede asignar/quitar el rol owner. */
 export function canAssignOwnerRole(roles: AppRole[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
+  if (login?.toLowerCase() === 'elmauwiii') return true
   return roles.includes('owner')
 }
 
-/** Owner o dev (o MauFuwari) pueden asignar/quitar el rol dev. */
+/** Owner o dev (o elmauwiii) pueden asignar/quitar el rol dev. */
 export function canAssignDevRole(roles: AppRole[], login?: string | null): boolean {
   return canAssignStrongRoles(roles, login)
 }
@@ -198,7 +200,7 @@ export function isRestrictedNav(roles: AppRole[], login?: string | null): boolea
 
 /** Usuario autenticado sin ningún rol asignado en la app. */
 export function isNoRoleUser(roles: AppRole[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return false
+  if (login?.toLowerCase() === 'elmauwiii') return false
   return roles.length === 0
 }
 
@@ -212,7 +214,7 @@ export function isDatosPath(pathname: string): boolean {
 }
 
 export function canAccessDatosNav(roles: AppRole[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
+  if (login?.toLowerCase() === 'elmauwiii') return true
   return roles.some((role) => DATOS_NAV_ROLES.includes(role))
 }
 
@@ -244,7 +246,7 @@ export function canAccessPath(roles: AppRole[], pathname: string, login?: string
 }
 
 export function defaultPathForRoles(roles: AppRole[], login?: string | null): string {
-  if (login?.toLowerCase() === 'maufuwari') return '/'
+  if (login?.toLowerCase() === 'elmauwiii') return '/'
   if (roles.includes('assistant') && !roles.includes('owner')) return CONTROL_CENTER_PATH
   if (hasFullNavAccess(roles, login)) return '/'
   if (roles.includes('designer')) return DESIGNER_DEFAULT_PATH

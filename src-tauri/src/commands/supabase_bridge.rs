@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 
 pub(crate) const DEFAULT_ORG_ID: &str = "00000000-0000-0000-0000-000000000001";
-const PROTECTED_LOGIN: &str = "maufuwari";
+const PROTECTED_LOGIN: &str = "elmauwiii";
 const SYNTHETIC_TWITCH_EMAIL_DOMAIN: &str = "twitch.neuragest.local";
 const ADMIN_ROLES: [&str; 2] = ["owner", "dev"];
 const ROLE_MANAGER_ROLES: [&str; 3] = ["owner", "dev", "assistant"];
@@ -174,6 +174,58 @@ pub(crate) async fn fetch_app_user_by_login(login: &str) -> Result<AppUserRow, S
         .ok_or_else(|| format!("Usuario no registrado: {login}"))
 }
 
+async fn fetch_app_user_by_twitch_user_id(twitch_user_id: &str) -> Result<Option<AppUserRow>, String> {
+    if twitch_user_id.trim().is_empty() {
+        return Ok(None);
+    }
+    let query = format!(
+        "/rest/v1/app_users?select=id,twitch_login,display_name,avatar_url,last_seen_at,auth_user_id&twitch_user_id=eq.{}",
+        urlencoding(twitch_user_id)
+    );
+    let response = supabase_request(Method::GET, &query, None, None, &[]).await?;
+    let rows: Vec<AppUserRow> =
+        supabase_json(response, "No se pudo leer app_user por twitch_user_id").await?;
+    Ok(rows.into_iter().next())
+}
+
+async fn patch_app_user_profile(
+    app_user_id: &str,
+    twitch_login: &str,
+    twitch_user_id: &str,
+    display_name: &str,
+    avatar_url: &str,
+    last_seen_at: &str,
+    auth_user_id: &str,
+) -> Result<AppUserRow, String> {
+    let body = json!({
+        "twitch_login": twitch_login.to_lowercase(),
+        "twitch_user_id": twitch_user_id,
+        "display_name": display_name,
+        "avatar_url": avatar_url,
+        "last_seen_at": last_seen_at,
+        "auth_user_id": auth_user_id,
+    });
+    let response = supabase_request(
+        Method::PATCH,
+        "/rest/v1/app_users",
+        Some(&format!("?id=eq.{app_user_id}")),
+        Some(body),
+        &[
+            ("Prefer", "return=representation"),
+            ("Accept", "application/vnd.pgrst.object+json"),
+        ],
+    )
+    .await?;
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!(
+            "No se pudo actualizar app_user ({status}): {body}"
+        ));
+    }
+    supabase_json(response, "No se pudo decodificar app_user actualizado").await
+}
+
 async fn fetch_app_user_by_id(user_id: &str) -> Result<AppUserRow, String> {
     let query = format!(
         "/rest/v1/app_users?select=id,twitch_login,display_name,avatar_url,last_seen_at,auth_user_id&id=eq.{}",
@@ -326,6 +378,29 @@ async fn link_auth_user_id(app_user_id: &str, auth_user_id: &str) -> Result<(), 
     Ok(())
 }
 
+/// Upsert `public.users` + espejo de `user_roles` vía RPC (también dispara tras PATCH auth_user_id).
+async fn sync_auth_user_from_app(auth_user_id: &str) -> Result<(), String> {
+    let response = supabase_request(
+        Method::POST,
+        "/rest/v1/rpc/sync_auth_user_from_app",
+        None,
+        Some(json!({
+            "p_auth_user_id": auth_user_id,
+            "p_org_id": DEFAULT_ORG_ID,
+        })),
+        &[],
+    )
+    .await?;
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!(
+            "No se pudo sincronizar membresía de org ({status}): {body}"
+        ));
+    }
+    Ok(())
+}
+
 async fn roles_for_login(login: &str) -> Result<Vec<String>, String> {
     let user = fetch_app_user_by_login(login).await?;
     fetch_roles_for_user_id(&user.id).await
@@ -390,38 +465,98 @@ pub async fn ensure_app_user(auth_user_id: String) -> Result<EnsureAppUserResult
 
     let (twitch_id, login, display_name, avatar_url) = resolve_twitch_profile(&auth_user_id).await?;
     let now = chrono::Utc::now().to_rfc3339();
+    let login_lc = login.to_lowercase();
 
-    let body = json!({
-        "organization_id": DEFAULT_ORG_ID,
-        "twitch_login": login.to_lowercase(),
-        "twitch_user_id": twitch_id,
-        "display_name": display_name,
-        "avatar_url": avatar_url,
-        "last_seen_at": now,
-    });
+    // Preferir identidad estable (twitch_user_id) para sobrevivir renames tipo mauwufari→elmauwiii.
+    let user = if let Some(existing) = fetch_app_user_by_twitch_user_id(&twitch_id).await? {
+        if existing.twitch_login != login_lc
+            || existing.auth_user_id.as_deref() != Some(auth_user_id.as_str())
+        {
+            tracing::info!(
+                old_login = %existing.twitch_login,
+                new_login = %login_lc,
+                "Actualizando app_user tras rename/login Twitch"
+            );
+        }
+        patch_app_user_profile(
+            &existing.id,
+            &login_lc,
+            &twitch_id,
+            &display_name,
+            &avatar_url,
+            &now,
+            &auth_user_id,
+        )
+        .await?
+    } else if let Ok(existing) = fetch_app_user_by_login(&login_lc).await {
+        patch_app_user_profile(
+            &existing.id,
+            &login_lc,
+            &twitch_id,
+            &display_name,
+            &avatar_url,
+            &now,
+            &auth_user_id,
+        )
+        .await?
+    } else {
+        let body = json!({
+            "organization_id": DEFAULT_ORG_ID,
+            "twitch_login": login_lc,
+            "twitch_user_id": twitch_id,
+            "display_name": display_name,
+            "avatar_url": avatar_url,
+            "last_seen_at": now,
+            "auth_user_id": auth_user_id,
+        });
 
-    let response = supabase_request(
-        Method::POST,
-        "/rest/v1/app_users",
-        Some("?on_conflict=twitch_login"),
-        Some(body),
-        &[
-            ("Prefer", "resolution=merge-duplicates,return=representation"),
-            ("Accept", "application/vnd.pgrst.object+json"),
-        ],
-    )
-    .await?;
+        let response = supabase_request(
+            Method::POST,
+            "/rest/v1/app_users",
+            Some("?on_conflict=twitch_user_id"),
+            Some(body),
+            &[
+                ("Prefer", "resolution=merge-duplicates,return=representation"),
+                ("Accept", "application/vnd.pgrst.object+json"),
+            ],
+        )
+        .await?;
 
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!(
-            "No se pudo registrar app_user ({status}): {body}"
-        ));
-    }
-
-    let user: AppUserRow =
-        supabase_json(response, "No se pudo decodificar app_user creado").await?;
+        if !response.status().is_success() {
+            // Fallback: conflicto por twitch_login (fila legacy sin twitch_user_id).
+            if let Ok(existing) = fetch_app_user_by_login(&login_lc).await {
+                patch_app_user_profile(
+                    &existing.id,
+                    &login_lc,
+                    &twitch_id,
+                    &display_name,
+                    &avatar_url,
+                    &now,
+                    &auth_user_id,
+                )
+                .await?
+            } else if let Some(existing) = fetch_app_user_by_twitch_user_id(&twitch_id).await? {
+                patch_app_user_profile(
+                    &existing.id,
+                    &login_lc,
+                    &twitch_id,
+                    &display_name,
+                    &avatar_url,
+                    &now,
+                    &auth_user_id,
+                )
+                .await?
+            } else {
+                let status = response.status();
+                let body = response.text().await.unwrap_or_default();
+                return Err(format!(
+                    "No se pudo registrar app_user ({status}): {body}"
+                ));
+            }
+        } else {
+            supabase_json(response, "No se pudo decodificar app_user creado").await?
+        }
+    };
 
     if let Some(previous_auth_user_id) = user.auth_user_id.as_deref() {
         if previous_auth_user_id != auth_user_id {
@@ -436,6 +571,11 @@ pub async fn ensure_app_user(auth_user_id: String) -> Result<EnsureAppUserResult
             )
         })?;
     }
+
+    // Garantiza public.users + user_roles (trigger también corre al setear auth_user_id).
+    sync_auth_user_from_app(&auth_user_id).await.map_err(|error| {
+        format!("Perfil vinculado, pero no se pudo activar membresía de organización: {error}")
+    })?;
 
     let roles = roles_for_login(&user.twitch_login).await.unwrap_or_default();
 
@@ -538,12 +678,12 @@ pub async fn set_app_user_roles(
         if losing_admin {
             if !caller_elevated {
                 return Err(
-                    "No puedes degradar roles owner/dev de MauFuwari.".into(),
+                    "No puedes degradar roles owner/dev de elmauwiii.".into(),
                 );
             }
             if !confirm_protected {
                 return Err(
-                    "MauFuwari requiere confirmación explícita para degradar roles owner/dev.".into(),
+                    "elmauwiii requiere confirmación explícita para degradar roles owner/dev.".into(),
                 );
             }
         }

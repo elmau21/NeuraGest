@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="design_doc_mode" content="canvas" />
+  <title>NeuraGest UI Refresh · Comparación</title>
+  <link rel="stylesheet" href="themes.css" />
+  <style>
+    :root {
+      --page-bg: #1a1b1e;
+      --page-text: #e8e6e1;
+      --page-muted: #9a968c;
+      --page-line: #2e2f33;
+    }
+    html, body { margin: 0; min-height: 100%; background: var(--page-bg); color: var(--page-text); font-family: "Geist", system-ui, sans-serif; }
+    .page {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 36px 24px 80px;
+    }
+    .page-hero h1 {
+      font-size: 28px;
+      letter-spacing: -0.04em;
+      margin: 0 0 8px;
+    }
+    .page-hero p {
+      margin: 0;
+      color: var(--page-muted);
+      font-size: 14px;
+      line-height: 1.55;
+      max-width: 72ch;
+    }
+    .page-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 18px 0 28px;
+    }
+    .chip {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--page-line);
+      color: var(--page-muted);
+      background: #121316;
+    }
+    .chip a { color: inherit; }
+    .dirs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    @media (max-width: 1100px) {
+      .dirs { grid-template-columns: 1fr; }
+    }
+    .dir-card {
+      background: #121316;
+      border: 1px solid var(--page-line);
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .dir-card header {
+      padding: 16px 16px 12px;
+      border-bottom: 1px solid var(--page-line);
+    }
+    .dir-card header .tag {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--page-muted);
+      margin-bottom: 6px;
+    }
+    .dir-card header h2 {
+      font-size: 17px;
+      letter-spacing: -0.03em;
+      margin: 0 0 6px;
+    }
+    .dir-card header p {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--page-muted);
+    }
+    .preview-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px;
+      background: #0c0c0e;
+    }
+    .frame-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #6b7280;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .frame {
+      border: 1px solid #25262b;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #09090b;
+      height: 200px;
+      position: relative;
+    }
+    .frame iframe {
+      width: 1280px;
+      height: 800px;
+      border: 0;
+      transform: scale(0.25);
+      transform-origin: top left;
+      pointer-events: none;
+    }
+    .dir-card footer {
+      margin-top: auto;
+      padding: 12px 16px 16px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--page-line);
+      background: #1c1d21;
+      color: var(--page-text);
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: #e12ec4;
+      border-color: #e12ec4;
+      color: #fff;
+    }
+    .btn-b { background: #8b6cf6; border-color: #8b6cf6; color: #fff; }
+    .btn-c { background: #101315; border-color: #2dd4bf; color: #f0f3f5; border-left-width: 3px; }
+    .assumptions, .coverage {
+      margin-top: 36px;
+      padding: 20px;
+      border: 1px solid var(--page-line);
+      border-radius: 12px;
+      background: #121316;
+    }
+    .assumptions h3, .coverage h3 { margin: 0 0 10px; font-size: 14px; }
+    .assumptions ul, .coverage ul { margin: 0; padding-left: 18px; color: var(--page-muted); font-size: 13px; line-height: 1.6; }
+    .coverage table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+    .coverage th, .coverage td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--page-line);
+      color: var(--page-muted);
+    }
+    .coverage th { color: var(--page-text); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .ok { color: #34d399; font-weight: 600; }
+    .pend { color: #fbbf24; font-weight: 600; }
+    .swatches { display: flex; gap: 6px; margin-top: 10px; }
+    .swatch { width: 18px; height: 18px; border-radius: 5px; border: 1px solid rgba(255,255,255,.12); }
+    .module-links {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+    }
+    .module-links a {
+      font-size: 10px; font-weight: 600; padding: 5px 8px;
+      border-radius: 6px; border: 1px solid var(--page-line);
+      color: var(--page-muted); text-decoration: none; background: #0c0c0e;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="page-hero">
+      <h1>NeuraGest · UI Refresh</h1>
+      <p>
+        Tres direcciones clean &amp; elegant que evolucionan el magenta/amethyst Neura
+        sin el tropo “AI purple glow”. <strong style="color:#e8e6e1;font-weight:600">Foco de esta pasada:</strong>
+        navegación (sidebar / top nav) — tres patrones distintos sobre el mismo inventario de
+        <code>nav-config.ts</code> (Tu día → Sistema, 39 módulos).
+      </p>
+    </div>
+
+    <div class="page-meta">
+      <span class="chip">Fidelidad: hi-fi interactivo</span>
+      <span class="chip">39 pantallas módulo + 3 auth</span>
+      <span class="chip">Sin design system externo</span>
+      <span class="chip"><a href="explore.html">Abrir explorador A/B/C →</a></span>
+    </div>
+
+    <div class="dirs">
+      <article class="dir-card" data-screen-label="dir-a">
+        <header>
+          <div class="tag">Dirección A</div>
+          <h2>Graphite Signal</h2>
+          <p>Zinc ops. Magenta flat como señal. <strong style="color:#e8e6e1;font-weight:600">Nav:</strong> sidebar accordion por sección (labels + conteo); colapsada = 7 iconos de área + peek panel.</p>
+          <div class="swatches">
+            <div class="swatch" style="background:#09090b"></div>
+            <div class="swatch" style="background:#18181b"></div>
+            <div class="swatch" style="background:#e12ec4"></div>
+            <div class="swatch" style="background:#fafafa"></div>
+          </div>
+          <div class="module-links">
+            <a href="explore.html?dir=a&amp;screen=control">Control</a>
+            <a href="explore.html?dir=a&amp;screen=tareas">Tareas</a>
+            <a href="explore.html?dir=a&amp;screen=war-room">War Room</a>
+            <a href="explore.html?dir=a&amp;screen=documentos">Docs</a>
+            <a href="explore.html?dir=a&amp;screen=diseno">Diseño</a>
+            <a href="explore.html?dir=a&amp;screen=nl-temp">NeuraLeague</a>
+            <a href="explore.html?dir=a&amp;screen=analitica">Analítica</a>
+            <a href="explore.html?dir=a&amp;screen=ajustes">Ajustes</a>
+          </div>
+        </header>
+        <div class="preview-stack">
+          <div>
+            <div class="frame-label">Login</div>
+            <div class="frame"><iframe src="explore.html?dir=a&amp;screen=login" title="A login" loading="lazy" tabindex="-1"></iframe></div>
+          </div>
+          <div>
+            <div class="frame-label">Centro de control</div>
+            <div class="frame"><iframe src="explore.html?dir=a&amp;screen=control" title="A control" loading="lazy" tabindex="-1"></iframe></div>
+          </div>
+          <div>
+            <div class="frame-label">Creative Drive</div>
+            <div class="frame"><iframe src="explore.html?dir=a&amp;screen=diseno" title="A diseño" loading="lazy" tabindex="-1"></iframe></div>
+          </div>
+        </div>
+        <footer>
+          <a class="btn btn-primary" href="explore.html?dir=a&amp;screen=login">Interactuar A</a>
+          <a class="btn" href="explore.html?dir=a&amp;screen=waiting">Waiting</a>
+          <a class="btn" href="explore.html?dir=a&amp;screen=dash">Resumen</a>
+        </footer>
+      </article>
+
+      <article class="dir-card" data-screen-label="dir-b">
+        <header>
+          <div class="tag">Dirección B</div>
+          <h2>Amethyst Quiet</h2>
+          <p>Slate frío + amethyst. <strong style="color:#e8e6e1;font-weight:600">Nav:</strong> icon rail de áreas + flyout fijable; hover revela módulos sin lista infinita.</p>
+          <div class="swatches">
+            <div class="swatch" style="background:#0b0d12"></div>
+            <div class="swatch" style="background:#141822"></div>
+            <div class="swatch" style="background:#8b6cf6"></div>
+            <div class="swatch" style="background:#eef1f7"></div>
+          </div>
+          <div class="module-links">
+            <a href="explore.html?dir=b&amp;screen=control">Control</a>
+            <a href="explore.html?dir=b&amp;screen=tareas">Tareas</a>
+            <a href="explore.html?dir=b&amp;screen=war-room">War Room</a>
+            <a href="explore.html?dir=b&amp;screen=documentos">Docs</a>
+            <a href="explore.html?dir=b&amp;screen=diseno">Diseño</a>
+            <a href="explore.html?dir=b&amp;screen=nl-temp">NeuraLeague</a>
+            <a href="explore.html?dir=b&amp;screen=analitica">Analítica</a>
+            <a href="explore.html?dir=b&amp;screen=ajustes">Ajustes</a>
+          </div>
+        </header>
+        <div class="preview-stack">
+          <div>
+            <div class="frame-label">Login</div>
+            <div class="frame"><iframe src="explore.html?dir=b&amp;screen=login" title="B login" loading="lazy" tabindex="-1"></iframe></div>
+          </div>
+          <div>
+            <div class="frame-label">Centro de control</div>
+            <div class="frame"><iframe src="explore.html?dir=b&amp;screen=control" title="B control" loading="lazy" tabindex="-1"></iframe></div>
+          </div>
+          <div>
+            <div class="frame-label">Creative Drive</div>
+            <div class="frame"><iframe src="explore.html?dir=b&amp;screen=diseno" title="B diseño" loading="lazy" tabindex="-1"></iframe></div>
+          </div>
+        </div>
+        <footer>
+          <a class="btn btn-b" href="explore.html?dir=b&amp;screen=login">Interactuar B</a>
+          <a class="btn" href="explore.html?dir=b&amp;screen=waiting">Waiting</a>
+          <a class="btn" href="explore.html?dir=b&amp;screen=dash">Resumen</a>
+        </footer>
+      </article>
+
+      <article class="dir-card" data-screen-label="dir-c">
+        <header>
+          <div class="tag">Dirección C</div>
+          <h2>Control Lattice</h2>
+          <p>Densidad de tool. <strong style="color:#e8e6e1;font-weight:600">Nav:</strong> top tabs por área + sidebar secundaria corta (solo el área activa). Colapsar oculta el side.</p>
+          <div class="swatches">
+            <div class="swatch" style="background:#070809"></div>
+            <div class="swatch" style="background:#101315"></div>
+            <div class="swatch" style="background:#d946ef"></div>
+            <div class="swatch" style="background:#2dd4bf"></div>
+          </div>
+          <div class="module-links">
+            <a href="explore.html?dir=c&amp;screen=control">Control</a>
+            <a href="explore.html?dir=c&amp;screen=tareas">Tareas</a>
+            <a href="explore.html?dir=c&amp;screen=war-room">War Room</a>
+            <a href="explore.html?dir=c&amp;screen=documentos">Docs</a>
+            <a href="explore.html?dir=c&amp;screen=diseno">Diseño</a>
+            <a href="explore.html?dir=c&amp;screen=nl-temp">NeuraLeague</a>
+            <a href="explore.html?dir=c&amp;screen=analitica">Analítica</a>
+            <a href="explore.html?dir=c&amp;screen=ajustes">Ajustes</a>
+          </div>
+        </header>
+        <div class="preview-stack">
+          <div>
+            <div class="frame-label">Login</div>
+            <div class="frame"><iframe src="explore.html?dir=c&amp;screen=login" title="C login" loading="lazy" tabindex="-1"></iframe></div>
+          </div>
+          <div>
+            <div class="frame-label">Centro de control</div>
+            <div class="frame"><iframe src="explore.html?dir=c&amp;screen=control" title="C control" loading="lazy" tabindex="-1"></iframe></div>
+          </div>
+          <div>
+            <div class="frame-label">Creative Drive</div>
+            <div class="frame"><iframe src="explore.html?dir=c&amp;screen=diseno" title="C diseño" loading="lazy" tabindex="-1"></iframe></div>
+          </div>
+        </div>
+        <footer>
+          <a class="btn btn-c" href="explore.html?dir=c&amp;screen=login">Interactuar C</a>
+          <a class="btn" href="explore.html?dir=c&amp;screen=waiting">Waiting</a>
+          <a class="btn" href="explore.html?dir=c&amp;screen=dash">Resumen</a>
+        </footer>
+      </article>
+    </div>
+
+    <section class="coverage">
+      <h3>Mapa de cobertura (nav real)</h3>
+      <table>
+        <thead>
+          <tr><th>Sección</th><th>Apartados</th><th>Estado</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Auth</td><td>Login, Waiting OAuth, Sin rol (+ Splash fuera de alcance interactivo)</td><td class="ok">Cubierto</td></tr>
+          <tr><td>Tu día</td><td>Centro de control, Resumen, Tareas, Talentos</td><td class="ok">Cubierto</td></tr>
+          <tr><td>Operación</td><td>War Room, Calendario, Pipeline, CRM, Cumplimiento, Comisiones, Portal</td><td class="ok">Cubierto</td></tr>
+          <tr><td>Contenido</td><td>Tarifas, Brief, Recursos, Entrega, Media Kit, Comparar, VOD, Board pack, Onboarding, Wiki, Documentos</td><td class="ok">Cubierto (representativo)</td></tr>
+          <tr><td>Diseño</td><td>Creative Drive (/diseno), Huecos, Briefs creativos</td><td class="ok">Cubierto</td></tr>
+          <tr><td>NeuraLeague</td><td>Temporada + 8 subrutas</td><td class="ok">Cubierto (representativo)</td></tr>
+          <tr><td>Datos</td><td>Analítica, Estadísticas, Inteligencia, Ciencia de datos, Auditoría</td><td class="ok">Cubierto</td></tr>
+          <tr><td>Sistema</td><td>Ajustes</td><td class="ok">Cubierto</td></tr>
+          <tr><td>Fuera del nav</td><td>/control/tareas, /control/fichas, /talento/:login, community/NeuBot</td><td class="pend">2º pase / N/A</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="assumptions">
+      <h3>Contexto &amp; supuestos</h3>
+      <ul>
+        <li>Inventario tomado de <code>src/services/nav-config.ts</code> + rutas en <code>App.tsx</code>. No existe apartado “community/NeuBot” en el nav actual.</li>
+        <li><strong>Nav v2:</strong> tres patrones distintos (A accordion, B rail+flyout, C top+side) — ya no hay lista plana de 39 iconos monocromos.</li>
+        <li>Subvistas profundas (detalle de tarea, perfil talento, tabs internas de Ajustes) quedan para un segundo pase hi-fi.</li>
+        <li>Explorador: selector “Módulo” + nav clickeable + toggle expandida/rail; URL <code>?dir=&amp;screen=</code> deep-linkeable.</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

@@ -76,7 +76,8 @@ jobs:
             latest.json
 
   build-linux:
-    if: github.ref_name != 'v1.0.12'
+    # Windows-only releases until Linux signing is ready (publish job tolerates skipped).
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

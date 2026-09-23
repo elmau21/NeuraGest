@@ -47,7 +47,7 @@ export type EnsureAppUserResult = {
 }
 
 export function canAccessAdminPanel(login?: string | null, roles: AppRole[] = []): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
+  if (login?.toLowerCase() === 'elmauwiii') return true
   return roles.some((role) => ADMIN_ROLES.includes(role))
 }
 

@@ -135,7 +135,7 @@ pub(crate) async fn require_manager_role() -> Result<String, String> {
         row.pointer("/roles/name")
             .and_then(Value::as_str)
             .is_some_and(|name| matches!(name, "owner" | "admin" | "manager" | "dev"))
-            || login == "maufuwari"
+            || login == "elmauwiii"
     });
     if allowed {
         Ok(app_user_id)

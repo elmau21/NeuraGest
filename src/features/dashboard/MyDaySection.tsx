@@ -114,7 +114,7 @@ export function MyDaySection() {
       meta: overdueCount > 0 ? `${overdueCount} atrasada${overdueCount === 1 ? '' : 's'}` : 'Al día con lo urgente',
       to: tasksPath,
       icon: ListTodo,
-      tone: overdueCount > 0 ? 'warn' : 'purple',
+      tone: overdueCount > 0 ? 'warn' : 'accent',
     },
     {
       key: 'live',

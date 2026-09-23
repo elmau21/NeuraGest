@@ -352,7 +352,12 @@ export function CrmPage() {
                   <button className="icon-btn" onClick={() => void removeRestriction(rule.id)} aria-label="Eliminar"><Trash2 size={14} /></button>
                 </div>
               ))}
-              {restrictions.length === 0 && <p className="empty-state">Sin reglas configuradas.</p>}
+              {restrictions.length === 0 && (
+                <EmptyState
+                  title="Sin reglas de marca"
+                  description="Define exclusividades o categorías bloqueadas para evitar conflictos en deals."
+                />
+              )}
             </div>
             <label>Talento
               <select value={restrictionDraft.talentId} onChange={(e) => setRestrictionDraft({ ...restrictionDraft, talentId: e.target.value })}>

@@ -13,13 +13,15 @@ import { TalentsSkeleton } from '@/components/Skeleton'
 import { toastError, toastSuccess } from '@/stores/toast-store'
 import { Dashboard } from '@/features/dashboard/Dashboard'
 import { Analytics } from '@/features/analytics/Analytics'
+import { SignalPulsePage } from '@/features/signal-pulse/SignalPulsePage'
+import { CoordinationPage } from '@/features/signal-pulse/CoordinationPage'
 import { PlatformStatsPage } from '@/features/platform-stats/PlatformStatsPage'
 import { TwitchIntelligencePage } from '@/features/twitch-intelligence/TwitchIntelligencePage'
 import { Documents } from '@/features/documents/Documents'
 import { LoginScreen } from '@/features/auth/LoginScreen'
 import { SplashScreen } from '@/features/auth/SplashScreen'
 import { neuraliveLogotype } from '@/assets/brand'
-import { useAppStore } from '@/stores/app-store'
+import { useAppStore, bindTalentLiveBridge } from '@/stores/app-store'
 import { OAuthWaitingPanel } from '@/features/auth/OAuthWaitingPanel'
 import { NoRoleWaitingPage } from '@/features/auth/NoRoleWaitingPage'
 import { PermissionsPanel } from '@/features/settings/PermissionsPanel'
@@ -33,6 +35,7 @@ import { GoogleCalendarSettings } from '@/features/settings/GoogleCalendarSettin
 import { TwitchHelixSettings } from '@/features/settings/TwitchHelixSettings'
 import { BackfillPanel } from '@/features/settings/BackfillPanel'
 import { TwitchTrackerPanel } from '@/features/settings/TwitchTrackerPanel'
+import { VrchatGroupsPanel } from '@/features/settings/VrchatGroupsPanel'
 import { UpdaterPanel } from '@/features/settings/UpdaterPanel'
 import { BackgroundUpdater } from '@/features/settings/BackgroundUpdater'
 import { ManagerTour } from '@/features/onboarding/ManagerTour'
@@ -90,7 +93,7 @@ import {
   isBasicSettingsOnly,
   isNoRoleUser,
 } from '@/services/permissions'
-import { navSections, navTourIds, settingsNav, type NavItem } from '@/services/nav-config'
+import { navSections, navTourIds, settingsNav, sistemaSection, type NavItem, type NavSection } from '@/services/nav-config'
 import {
   isNavItemHidden,
   NAV_VISIBILITY_CHANGED,
@@ -359,6 +362,7 @@ function SettingsPage() {
         {showSecrets && <TwitchHelixSettings/>}
         <BackfillPanel/>
         <TwitchTrackerPanel/>
+        <VrchatGroupsPanel/>
         <SupabaseStatusCard/>
         <NativeAlertSettings/>
         <LiveSoundSettings/>
@@ -396,6 +400,7 @@ function RoleRouteGuard() {
     '/ml',
     '/estadisticas',
     '/analitica',
+    '/senal',
     '/auditoria',
   ]
   if (inlinePermissionRoutes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {
@@ -407,11 +412,22 @@ function RoleRouteGuard() {
   return null
 }
 
+function pathMatchesNav(pathname: string, to: string) {
+  if (to === '/') return pathname === '/'
+  return pathname === to || pathname.startsWith(`${to}/`)
+}
+
+function findSectionForPath(pathname: string): NavSection | null {
+  if (pathMatchesNav(pathname, settingsNav[0])) return sistemaSection
+  return navSections.find((s) => s.items.some(([to]) => pathMatchesNav(pathname, to))) ?? null
+}
+
 function Shell() {
   const [mobile, setMobile] = useState(false)
   const [isNarrow, setIsNarrow] = useState(false)
   const [collapsed, setCollapsed] = useState(readSidebarCollapsed)
   const [sectionCollapsed, setSectionCollapsed] = useState<SidebarSectionState>(readSidebarSections)
+  const [peekTitle, setPeekTitle] = useState<string | null>(null)
   const demo = useAppStore((s) => s.demoMode)
   const helixStatus = useAppStore((s) => s.helixStatus)
   const refreshTalentData = useAppStore((s) => s.refreshTalentData)
@@ -438,9 +454,7 @@ function Shell() {
 
   useEffect(() => {
     if (noRole) return
-    const section = navSections.find((s) =>
-      s.items.some(([to]) => (to === '/' ? location.pathname === '/' : location.pathname === to || location.pathname.startsWith(`${to}/`))),
-    )
+    const section = findSectionForPath(location.pathname)
     if (!section) return
     setSectionCollapsed((prev) => {
       if (!isSidebarSectionCollapsed(prev, section.title)) return prev
@@ -448,7 +462,12 @@ function Shell() {
       writeSidebarSections(next)
       return next
     })
+    setPeekTitle(null)
   }, [location.pathname, noRole])
+
+  useEffect(() => {
+    if (!collapsed) setPeekTitle(null)
+  }, [collapsed])
 
   useEffect(() => {
     if (noRole) return
@@ -472,7 +491,13 @@ function Shell() {
         e.preventDefault()
         setShortcutsOpen(true)
       }
-      if (e.key === 'Escape') { setCommandOpen(false); setShortcutsOpen(false); setUserMenuOpen(false); setMobile(false) }
+      if (e.key === 'Escape') {
+        setCommandOpen(false)
+        setShortcutsOpen(false)
+        setUserMenuOpen(false)
+        setMobile(false)
+        setPeekTitle(null)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -487,10 +512,25 @@ function Shell() {
   }, [userMenuOpen, noRole])
 
   useEffect(() => {
+    if (!peekTitle) return
+    const close = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t?.closest('.nav-peek, .nav-a-rail, .nav-rail-btn')) return
+      setPeekTitle(null)
+    }
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [peekTitle])
+
+  useEffect(() => {
     if (noRole) return
     void refreshTalentData()
     const polling = window.setInterval(() => { void refreshTalentData() }, 60_000)
-    return () => window.clearInterval(polling)
+    const unbindLive = bindTalentLiveBridge()
+    return () => {
+      window.clearInterval(polling)
+      unbindLive()
+    }
   }, [refreshTalentData, noRole])
 
   if (noRole) {
@@ -522,8 +562,35 @@ function Shell() {
   const sidebarDot = demo || helixStatus === 'error' ? 'offline-dot' : helixStatus === 'connected' ? 'online-dot' : 'pending-dot'
   const avatarLabel = session?.displayName.slice(0, 2).toUpperCase() ?? 'NL'
   const shellClass = [collapsed ? 'app-shell vision-ui sidebar-collapsed' : 'app-shell vision-ui', isNarrow ? 'is-narrow' : ''].filter(Boolean).join(' ')
-  const asideClass = [mobile ? 'open' : '', collapsed && !isNarrow ? 'collapsed' : ''].filter(Boolean).join(' ')
-  const renderNavLink = (item: NavItem) => {
+  const railMode = collapsed && !isNarrow
+  const asideClass = [mobile ? 'open' : '', railMode ? 'collapsed' : ''].filter(Boolean).join(' ')
+
+  const visibleSections = navSections
+    .map((section) => {
+      const items = filterNavItems(
+        section.title,
+        section.items,
+        roles,
+        login,
+        navPrefs,
+        showAudit,
+        showControlCenter,
+      )
+      if (items.length === 0) return null
+      return { ...section, items }
+    })
+    .filter((s): s is NavSection & { items: NavItem[] } => s !== null)
+
+  const showSistema = showSettingsNav && !isNavItemHidden(navPrefs, settingsNav[0], 'Ajustes')
+  const accordionSections: Array<NavSection & { items: NavItem[] }> = [
+    ...visibleSections,
+    ...(showSistema ? [{ ...sistemaSection, items: [settingsNav] as NavItem[] }] : []),
+  ]
+  const peekSection = peekTitle
+    ? accordionSections.find((s) => s.title === peekTitle) ?? null
+    : null
+
+  const renderNavLink = (item: NavItem, opts?: { onNavigate?: () => void }) => {
     const [to, label, Icon] = item
     const tourId = navTourIds[to]
     return (
@@ -531,17 +598,59 @@ function Shell() {
         key={to}
         to={to}
         end={to === '/' || to === '/diseno' || to === '/neuralleague' || to === '/control'}
-        onClick={() => setMobile(false)}
-        title={collapsed ? label : undefined}
+        onClick={() => {
+          setMobile(false)
+          opts?.onNavigate?.()
+        }}
+        title={railMode ? label : undefined}
         data-nav-label={label}
         data-tour={tourId}
         className={to === '/control' ? 'nav-control-center' : undefined}
       >
-        <Icon className="sidebar-icon" size={16} strokeWidth={1.6} absoluteStrokeWidth />
+        <Icon className="sidebar-icon" size={15} strokeWidth={1.6} absoluteStrokeWidth />
         <span className="sidebar-link-label">{label}</span>
       </NavLink>
     )
   }
+
+  const renderAccordion = (section: NavSection & { items: NavItem[] }) => {
+    const SectionIcon = section.icon
+    const isSectionCollapsed = isSidebarSectionCollapsed(sectionCollapsed, section.title)
+    const hasActive = section.items.some(([to]) => pathMatchesNav(location.pathname, to))
+    return (
+      <div
+        className={`nav-acc${isSectionCollapsed ? ' is-collapsed' : ' is-open'}${hasActive ? ' has-active' : ''}`}
+        key={section.title}
+      >
+        <button
+          type="button"
+          className="nav-acc-head"
+          onClick={() => toggleSection(section.title)}
+          aria-expanded={!isSectionCollapsed}
+          aria-label={`${section.title} — ${isSectionCollapsed ? 'expandir' : 'colapsar'} sección`}
+        >
+          <SectionIcon className="sidebar-icon" size={15} strokeWidth={1.6} absoluteStrokeWidth />
+          <span className="nav-acc-title">{section.title}</span>
+          <span className="nav-acc-count">{section.items.length}</span>
+          <ChevronDown
+            size={12}
+            strokeWidth={1.6}
+            className={`nav-acc-chev${!isSectionCollapsed ? ' open' : ''}`}
+          />
+        </button>
+        <div
+          className="sidebar-section-body nav-acc-body"
+          inert={isSectionCollapsed ? true : undefined}
+          aria-hidden={isSectionCollapsed}
+        >
+          <div className="sidebar-section-body-inner">
+            {section.items.map((item) => renderNavLink(item))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return <div className={shellClass}><DiscordPresenceSync /><OrgPresenceSync /><aside className={asideClass}>
     <div className="sidebar-brand-header">
       <div className="brand">
@@ -549,63 +658,58 @@ function Shell() {
         <img src={neuraliveLogotype} alt="NeuraGest by NeuraLive" className="brand-logotype" draggable={false} />
         <button type="button" className="sidebar-mobile-close" onClick={() => setMobile(false)} aria-label="Cerrar menú"><X size={16} strokeWidth={1.6} /></button>
       </div>
-      <small className="brand-app-name">NeuraGest</small>
+      {!railMode && <small className="brand-app-name">NeuraGest</small>}
     </div>
     <button type="button" className="sidebar-collapse-btn" onClick={toggleCollapsed} aria-label={collapsed ? 'Expandir sidebar' : 'Colapsar sidebar'} aria-expanded={!collapsed}>
       {collapsed ? <ChevronRight size={14} strokeWidth={1.6} /> : <ChevronLeft size={14} strokeWidth={1.6} />}
     </button>
-    <nav>
-      {navSections.map((section) => {
-        const visibleItems = filterNavItems(
-          section.title,
-          section.items,
-          roles,
-          login,
-          navPrefs,
-          showAudit,
-          showControlCenter,
-        )
-        if (visibleItems.length === 0) return null
-        const isSectionCollapsed = isSidebarSectionCollapsed(sectionCollapsed, section.title)
-        return (
-          <div
-            className={`sidebar-section${isSectionCollapsed ? ' sidebar-section-collapsed' : ''}`}
-            key={section.title}
-          >
+    {railMode ? (
+      <nav className="nav-a-rail" aria-label="Secciones">
+        {accordionSections.map((section) => {
+          const SectionIcon = section.icon
+          const hasActive = section.items.some(([to]) => pathMatchesNav(location.pathname, to))
+          return (
             <button
+              key={section.title}
               type="button"
-              className="sidebar-section-toggle"
-              onClick={() => toggleSection(section.title)}
-              aria-expanded={!isSectionCollapsed}
-              aria-label={`${section.title} — ${isSectionCollapsed ? 'expandir' : 'colapsar'} sección`}
+              className={`nav-rail-btn${hasActive ? ' active' : ''}${peekTitle === section.title ? ' peek' : ''}`}
+              title={section.title}
+              aria-label={section.title}
+              aria-expanded={peekTitle === section.title}
+              onClick={(e) => {
+                e.stopPropagation()
+                setPeekTitle((prev) => (prev === section.title ? null : section.title))
+              }}
             >
-              <span className="sidebar-section-label">{section.title}</span>
-              <ChevronDown
-                size={12}
-                strokeWidth={1.6}
-                className={`sidebar-section-chevron${isSectionCollapsed ? ' collapsed' : ''}`}
-              />
+              <SectionIcon size={17} strokeWidth={1.6} absoluteStrokeWidth />
             </button>
-            <div className="sidebar-section-body" inert={!collapsed && isSectionCollapsed ? true : undefined} aria-hidden={isSectionCollapsed && !collapsed}>
-              <div className="sidebar-section-body-inner">
-                {visibleItems.map(renderNavLink)}
-              </div>
-            </div>
-          </div>
-        )
-      })}
-      {showSettingsNav && !isNavItemHidden(navPrefs, settingsNav[0], 'Ajustes') && (
-        <div className="sidebar-section sidebar-section-settings">
-          {renderNavLink(settingsNav)}
-        </div>
-      )}
-    </nav>
-    <div className="sidebar-footer" title={collapsed ? sidebarLabel : undefined}>
+          )
+        })}
+      </nav>
+    ) : (
+      <nav className="nav-a-list" aria-label="Navegación">
+        {accordionSections.map(renderAccordion)}
+      </nav>
+    )}
+    <div className="sidebar-footer" title={railMode ? sidebarLabel : undefined}>
       <div className={sidebarDot} />
-      <span>{sidebarLabel}<small>Monitoreo público + caché local</small></span>
+      {!railMode && <span>{sidebarLabel}<small>Monitoreo público + caché local</small></span>}
     </div>
   </aside>
-    <main><header className="app-header"><button className="mobile-menu" onClick={() => setMobile(true)} aria-label="Abrir menú"><Menu/></button><button className="quick-search" onClick={() => setCommandOpen(true)}><Search size={16}/>Buscar en NeuraGest<kbd>Ctrl K</kbd></button><div className="header-actions"><ActiveUsersBadge/><ActivityInbox/><div className="user-menu-wrap"><div className="header-user-block"><div className="header-user-text"><b>{session?.displayName ?? 'Usuario'}</b><span>@{session?.login ?? 'twitch'}</span></div><button className="user-avatar" onClick={(e) => { e.stopPropagation(); setUserMenuOpen((open) => !open) }} aria-label="Menú de usuario">{session?.avatarUrl ? <img src={session.avatarUrl} alt="" /> : avatarLabel}</button></div>{userMenuOpen && <div className="user-menu" onClick={(e) => e.stopPropagation()}><div className="user-menu-head"><b>{session?.displayName ?? 'Usuario'}</b><span>@{session?.login ?? 'twitch'}</span></div><button onClick={() => { setUserMenuOpen(false); void logout() }}><LogOut size={15}/>Cerrar sesión</button></div>}</div></div></header><OfflineBanner /><div className="content"><RoleRouteGuard/><PageTransition><Routes location={location}><Route path="/" element={<Dashboard/>}/><Route path="/control" element={<PermissionGate allowed={showControlCenter} denial={getControlCenterDenial(roles)}><ControlCenterPage/></PermissionGate>}/><Route path="/control/tareas" element={<PermissionGate allowed={showControlCenter} denial={getControlCenterDenial(roles)}><AssistantTasksPage/></PermissionGate>}/><Route path="/control/fichas" element={<PermissionGate allowed={showControlCenter} denial={getControlCenterDenial(roles)}><EventFichasPage/></PermissionGate>}/><Route path="/asistente" element={<Navigate to="/control" replace />}/><Route path="/war-room" element={<WarRoomPage/>}/><Route path="/talentos" element={<Talents/>}/><Route path="/talento/:login" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando perfil…</div>}><TalentProfilePage/></Suspense>}/><Route path="/pipeline" element={<PipelinePage/>}/><Route path="/crm" element={<CrmPage/>}/><Route path="/rate-card" element={<RateCardPage/>}/><Route path="/brief" element={<BriefPage/>}/><Route path="/assets" element={<AssetsPage/>}/><Route path="/diseno" element={<CreativeDrivePage/>}/><Route path="/diseno/huecos" element={<ChannelGapsPage/>}/><Route path="/diseno/briefs" element={<CreativeBriefsPage/>}/><Route path="/neuralleague" element={<NeuraLeagueOverviewPage/>}/><Route path="/neuralleague/equipos" element={<NeuraLeagueTeamsPage/>}/><Route path="/neuralleague/jugadores" element={<NeuraLeaguePlayersPage/>}/><Route path="/neuralleague/calendario" element={<NeuraLeagueCalendarPage/>}/><Route path="/neuralleague/stats" element={<NeuraLeagueStatsPage/>}/><Route path="/neuralleague/vods" element={<NeuraLeagueVodsPage/>}/><Route path="/neuralleague/entrenamientos" element={<NeuraLeagueTrainingPage/>}/><Route path="/neuralleague/reclutamiento" element={<NeuraLeagueRecruitmentPage/>}/><Route path="/neuralleague/operacion" element={<NeuraLeagueOperationsPage/>}/><Route path="/handoff" element={<HandoffPage/>}/><Route path="/comisiones" element={<CommissionsPage/>}/><Route path="/portal" element={<PortalPage/>}/><Route path="/portal/:login" element={<PortalPage/>}/><Route path="/media-kit" element={<MediaKitPage/>}/><Route path="/media-kit/comparar" element={<MediaKitComparePage/>}/><Route path="/vod-digest" element={<VodDigestPage/>}/><Route path="/board-pack" element={<BoardPackPage/>}/><Route path="/schedule" element={<ScheduleCompliancePage/>}/><Route path="/onboarding" element={<OnboardingPage/>}/><Route path="/tareas" element={<TasksPage/>}/><Route path="/wiki" element={<WikiPage/>}/><Route path="/documentos" element={<Documents/>}/><Route path="/calendario" element={<CalendarPage/>}/><Route path="/inteligencia" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><TwitchIntelligencePage/></PermissionGate>}/><Route path="/ciencia-datos" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense></PermissionGate>}/><Route path="/ml" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense></PermissionGate>}/><Route path="/estadisticas" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><PlatformStatsPage/></PermissionGate>}/><Route path="/analitica" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><Analytics/></PermissionGate>}/><Route path="/auditoria" element={<PermissionGate allowed={showAudit && canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><AuditPage/></PermissionGate>}/><Route path="/ajustes" element={<SettingsPage/>}/></Routes></PageTransition></div></main><CommandPalette/><ShortcutsHelp/><BackgroundUpdater/><OnboardingModal/><ManagerTour/></div>
+  {railMode && peekSection && (
+    <div className="nav-peek" role="dialog" aria-label={peekSection.title} onClick={(e) => e.stopPropagation()}>
+      <div className="nav-peek-head">
+        <strong>{peekSection.title}</strong>
+        <button type="button" className="sidebar-collapse-btn" style={{ margin: 0 }} onClick={() => setPeekTitle(null)} aria-label="Cerrar">
+          <X size={14} strokeWidth={1.6} />
+        </button>
+      </div>
+      <div className="nav-peek-body">
+        {peekSection.items.map((item) => renderNavLink(item, { onNavigate: () => setPeekTitle(null) }))}
+      </div>
+    </div>
+  )}
+    <main><header className="app-header"><button className="mobile-menu" onClick={() => setMobile(true)} aria-label="Abrir menú"><Menu/></button><button className="quick-search" onClick={() => setCommandOpen(true)}><Search size={16}/>Buscar en NeuraGest<kbd>Ctrl K</kbd></button><div className="header-actions"><ActiveUsersBadge/><ActivityInbox/><div className="user-menu-wrap"><div className="header-user-block"><div className="header-user-text"><b>{session?.displayName ?? 'Usuario'}</b><span>@{session?.login ?? 'twitch'}</span></div><button className="user-avatar" onClick={(e) => { e.stopPropagation(); setUserMenuOpen((open) => !open) }} aria-label="Menú de usuario">{session?.avatarUrl ? <img src={session.avatarUrl} alt="" /> : avatarLabel}</button></div>{userMenuOpen && <div className="user-menu" onClick={(e) => e.stopPropagation()}><div className="user-menu-head"><b>{session?.displayName ?? 'Usuario'}</b><span>@{session?.login ?? 'twitch'}</span></div><button onClick={() => { setUserMenuOpen(false); void logout() }}><LogOut size={15}/>Cerrar sesión</button></div>}</div></div></header><OfflineBanner /><div className="content"><RoleRouteGuard/><PageTransition><Routes location={location}><Route path="/" element={<Dashboard/>}/><Route path="/control" element={<PermissionGate allowed={showControlCenter} denial={getControlCenterDenial(roles)}><ControlCenterPage/></PermissionGate>}/><Route path="/control/tareas" element={<PermissionGate allowed={showControlCenter} denial={getControlCenterDenial(roles)}><AssistantTasksPage/></PermissionGate>}/><Route path="/control/fichas" element={<PermissionGate allowed={showControlCenter} denial={getControlCenterDenial(roles)}><EventFichasPage/></PermissionGate>}/><Route path="/asistente" element={<Navigate to="/control" replace />}/><Route path="/war-room" element={<WarRoomPage/>}/><Route path="/talentos" element={<Talents/>}/><Route path="/talento/:login" element={<Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando perfil…</div>}><TalentProfilePage/></Suspense>}/><Route path="/pipeline" element={<PipelinePage/>}/><Route path="/crm" element={<CrmPage/>}/><Route path="/rate-card" element={<RateCardPage/>}/><Route path="/brief" element={<BriefPage/>}/><Route path="/assets" element={<AssetsPage/>}/><Route path="/diseno" element={<CreativeDrivePage/>}/><Route path="/diseno/huecos" element={<ChannelGapsPage/>}/><Route path="/diseno/briefs" element={<CreativeBriefsPage/>}/><Route path="/neuralleague" element={<NeuraLeagueOverviewPage/>}/><Route path="/neuralleague/equipos" element={<NeuraLeagueTeamsPage/>}/><Route path="/neuralleague/jugadores" element={<NeuraLeaguePlayersPage/>}/><Route path="/neuralleague/calendario" element={<NeuraLeagueCalendarPage/>}/><Route path="/neuralleague/stats" element={<NeuraLeagueStatsPage/>}/><Route path="/neuralleague/vods" element={<NeuraLeagueVodsPage/>}/><Route path="/neuralleague/entrenamientos" element={<NeuraLeagueTrainingPage/>}/><Route path="/neuralleague/reclutamiento" element={<NeuraLeagueRecruitmentPage/>}/><Route path="/neuralleague/operacion" element={<NeuraLeagueOperationsPage/>}/><Route path="/handoff" element={<HandoffPage/>}/><Route path="/comisiones" element={<CommissionsPage/>}/><Route path="/portal" element={<PortalPage/>}/><Route path="/portal/:login" element={<PortalPage/>}/><Route path="/media-kit" element={<MediaKitPage/>}/><Route path="/media-kit/comparar" element={<MediaKitComparePage/>}/><Route path="/vod-digest" element={<VodDigestPage/>}/><Route path="/board-pack" element={<BoardPackPage/>}/><Route path="/schedule" element={<ScheduleCompliancePage/>}/><Route path="/onboarding" element={<OnboardingPage/>}/><Route path="/tareas" element={<TasksPage/>}/><Route path="/wiki" element={<WikiPage/>}/><Route path="/documentos" element={<Documents/>}/><Route path="/calendario" element={<CalendarPage/>}/><Route path="/inteligencia" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><TwitchIntelligencePage/></PermissionGate>}/><Route path="/ciencia-datos" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense></PermissionGate>}/><Route path="/ml" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><Suspense fallback={<div className="ml-loading" style={{padding:40,textAlign:'center'}}><Loader2 size={20} className="ml-spin"/> Cargando ML…</div>}><MlPage/></Suspense></PermissionGate>}/><Route path="/estadisticas" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><PlatformStatsPage/></PermissionGate>}/><Route path="/senal" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><SignalPulsePage/></PermissionGate>}/><Route path="/senal/coordinacion" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><CoordinationPage/></PermissionGate>}/><Route path="/analitica" element={<PermissionGate allowed={canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><Analytics/></PermissionGate>}/><Route path="/auditoria" element={<PermissionGate allowed={showAudit && canAccessDatosNav(roles, login)} denial={getDatosDenial(roles)}><AuditPage/></PermissionGate>}/><Route path="/ajustes" element={<SettingsPage/>}/></Routes></PageTransition></div></main><CommandPalette/><ShortcutsHelp/><BackgroundUpdater/><OnboardingModal/><ManagerTour/></div>
 }
 
 function AppGate() {

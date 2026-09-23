@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ExternalLink,
+  Film,
   Maximize2,
   MessageSquare,
   Minimize2,
@@ -18,7 +20,8 @@ import {
   canEmbedTwitchPlayer,
 } from './twitch-embed'
 import { openTwitchWithAccount } from '@/services/twitch-watch'
-import { toastSuccess } from '@/stores/toast-store'
+import { createTwitchClip, fetchLiveExtras, type LiveExtras } from '@/services/helix-live'
+import { toastError, toastSuccess } from '@/stores/toast-store'
 
 type StreamTileProps = {
   talent: Talent
@@ -45,6 +48,27 @@ export function StreamTile({
   const playerSrc = buildTwitchPlayerUrl(talent.login, { muted, autoplay: true })
   const chatSrc = buildTwitchChatUrl(talent.login)
   const channelUrl = buildTwitchChannelUrl(talent.login)
+  const [extras, setExtras] = useState<LiveExtras | null>(null)
+  const [clipBusy, setClipBusy] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = () => {
+      void fetchLiveExtras(talent.login, talent.viewers)
+        .then((row) => {
+          if (!cancelled) setExtras(row)
+        })
+        .catch(() => {
+          if (!cancelled) setExtras(null)
+        })
+    }
+    load()
+    const timer = window.setInterval(load, 45_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [talent.login, talent.viewers])
 
   const watchWithAccount = () => {
     void openTwitchWithAccount(talent.login).then((mode) => {
@@ -55,6 +79,27 @@ export function StreamTile({
       )
     })
   }
+
+  const clipNow = () => {
+    setClipBusy(true)
+    void createTwitchClip(talent.login)
+      .then((clip) => {
+        toastSuccess('Clip creado — se abre el editor de Twitch')
+        window.open(clip.editUrl || clip.url, '_blank', 'noopener,noreferrer')
+      })
+      .catch((err) => toastError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setClipBusy(false))
+  }
+
+  const chattersLabel = extras?.chatters?.available
+    ? extras.chatters.chatters.toLocaleString('es-MX')
+    : '—'
+  const adsNote = extras?.ads?.available
+    ? (extras.ads.nextAdAt
+        ? `Próx. ad ${new Date(extras.ads.nextAdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`
+        : 'Sin ad programado')
+    : extras?.ads?.note ?? null
+  const goal = extras?.goals?.goals?.[0]
 
   return (
     <article
@@ -77,8 +122,21 @@ export function StreamTile({
           </div>
         </div>
         <span className="ops-live-pill">● LIVE</span>
-        <strong className="wr-stream-viewers">{talent.viewers.toLocaleString('es-MX')}</strong>
+        <strong className="wr-stream-viewers" title="Viewers en vivo">
+          {talent.viewers.toLocaleString('es-MX')}
+          <small className="wr-chatters-vs">chat {chattersLabel}</small>
+        </strong>
         <div className="wr-stream-actions">
+          <button
+            type="button"
+            className="wr-icon-btn"
+            title="Clip ahora"
+            aria-label={`Crear clip de ${talent.displayName}`}
+            disabled={clipBusy}
+            onClick={clipNow}
+          >
+            <Film size={14} />
+          </button>
           <button
             type="button"
             className="wr-icon-btn wr-icon-account"
@@ -184,6 +242,30 @@ export function StreamTile({
 
       <div className="wr-stream-foot">
         {talent.title ? <p className="wr-stream-title">{talent.title}</p> : null}
+        <div className="wr-helix-meta">
+          {(talent.tags ?? extras?.channel?.tags ?? []).slice(0, 4).map((tag) => (
+            <span key={tag} className="signal-chip">{tag}</span>
+          ))}
+          {(talent.language || extras?.channel?.language) && (
+            <span className="signal-chip">{talent.language || extras?.channel?.language}</span>
+          )}
+          {(talent.contentClassificationLabels ?? extras?.channel?.contentClassificationLabels ?? [])
+            .slice(0, 2)
+            .map((label) => (
+              <span key={label} className="signal-chip ccl">{label}</span>
+            ))}
+          {adsNote ? <span className="signal-chip ads" title="Ventana de ads">{adsNote}</span> : null}
+          {goal ? (
+            <span className="signal-chip goal" title={goal.description}>
+              Goal {goal.currentAmount}/{goal.targetAmount}
+            </span>
+          ) : null}
+          {extras?.subscriptions?.available ? (
+            <span className="signal-chip subs">
+              Subs {extras.subscriptions.total} · pts {extras.subscriptions.points}
+            </span>
+          ) : null}
+        </div>
         <button type="button" className="wr-account-cta" onClick={watchWithAccount}>
           <UserCheck size={13} />
           Ver con mi cuenta

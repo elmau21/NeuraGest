@@ -13,10 +13,10 @@ use tokio::sync::Mutex;
 
 const SERVICE: &str = "com.neuralive.neuragest";
 const ACCOUNT: &str = "twitch-oauth";
-const OAUTH_SCOPES: &str = "user:read:email moderator:read:followers channel:read:subscriptions clips:edit";
-pub(crate) const TALENTS: [&str; 13] = [
+const OAUTH_SCOPES: &str = "user:read:email moderator:read:followers channel:read:subscriptions clips:edit moderator:read:chatters channel:read:ads channel:read:goals";
+pub(crate) const TALENTS: [&str; 15] = [
     "arikyu_", "nosomevt", "lakumita", "ryonikku", "suimivt", "tesitoazul", "shisuvr", "bhikoruvt",
-    "ashitakaseiren", "cold__vt", "shirookouwu", "creeperdutyvt", "alexyshai",
+    "ashitakaseiren", "cold__vt", "shirookouwu", "creeperdutyvt", "alexyshai", "yosoyastra", "niel",
 ];
 static APP_TOKEN: OnceLock<Mutex<Option<AppAccessToken>>> = OnceLock::new();
 static PENDING_DEVICE: OnceLock<Mutex<Option<PendingDeviceFlow>>> = OnceLock::new();
@@ -34,19 +34,19 @@ struct AppAccessToken {
     expires_at: i64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct StoredTokens {
-    access_token: String,
-    refresh_token: String,
-    expires_at: i64,
-    client_id: String,
-    scopes: Vec<String>,
+    pub(crate) access_token: String,
+    pub(crate) refresh_token: String,
+    pub(crate) expires_at: i64,
+    pub(crate) client_id: String,
+    pub(crate) scopes: Vec<String>,
     #[serde(default)]
-    login: Option<String>,
+    pub(crate) login: Option<String>,
     #[serde(default)]
-    display_name: Option<String>,
+    pub(crate) display_name: Option<String>,
     #[serde(default)]
-    avatar_url: Option<String>,
+    pub(crate) avatar_url: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -107,7 +107,7 @@ struct HelixResponse<T> {
     data: Vec<T>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct HelixUser {
     id: String,
     login: String,
@@ -122,6 +122,9 @@ struct HelixUser {
 #[derive(Debug, Deserialize)]
 struct HelixStream {
     id: String,
+    user_id: String,
+    #[serde(default)]
+    #[allow(dead_code)]
     user_login: String,
     game_name: String,
     title: String,
@@ -155,6 +158,15 @@ pub struct TalentSnapshot {
     /// URL de imagen offline del canal (vacía si el talento no la configuró).
     #[serde(default)]
     pub(crate) offline_image_url: String,
+    /// Tags Helix (GET /channels).
+    #[serde(default)]
+    pub(crate) tags: Vec<String>,
+    /// Idioma del canal (broadcaster_language).
+    #[serde(default)]
+    pub(crate) language: String,
+    /// Content Classification Labels (CCL).
+    #[serde(default)]
+    pub(crate) content_classification_labels: Vec<String>,
 }
 
 pub(crate) const TWITCH_CONFIG_MISSING: &str =
@@ -555,6 +567,63 @@ async fn fetch_follower_totals(
     totals
 }
 
+fn display_name_for_talent(login: &str, helix_display_name: &str) -> String {
+    if login.eq_ignore_ascii_case("nosomevt") {
+        "Nosome".into()
+    } else {
+        helix_display_name.to_string()
+    }
+}
+
+/// Helix GET /users por `id` (estable) y/o `login` (bootstrap / sin id en DB).
+async fn fetch_helix_users_for_roster(
+    client: &reqwest::Client,
+    client_id: &str,
+    access_token: &str,
+    targets: &[crate::twitch::roster::RosterTarget],
+) -> Result<Vec<HelixUser>, String> {
+    let mut users_url =
+        url::Url::parse("https://api.twitch.tv/helix/users").map_err(|error| error.to_string())?;
+    let mut seen_ids = std::collections::HashSet::new();
+    let mut seen_logins = std::collections::HashSet::new();
+    let mut appended = 0usize;
+    for target in targets {
+        if let Some(id) = target.twitch_user_id.as_deref().filter(|v| !v.is_empty()) {
+            if seen_ids.insert(id.to_string()) {
+                users_url.query_pairs_mut().append_pair("id", id);
+                appended += 1;
+            }
+        } else if seen_logins.insert(target.login.to_lowercase()) {
+            users_url
+                .query_pairs_mut()
+                .append_pair("login", &target.login);
+            appended += 1;
+        }
+    }
+    if appended == 0 {
+        return Ok(Vec::new());
+    }
+    let users_response = client
+        .get(users_url)
+        .header("Client-Id", client_id)
+        .bearer_auth(access_token)
+        .send()
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "Error consultando perfiles Twitch");
+            "No se pudo consultar perfiles de Twitch.".to_string()
+        })?;
+    if !users_response.status().is_success() {
+        tracing::warn!(status = %users_response.status(), "Twitch rechazó consulta de perfiles");
+        return Err("No se pudo obtener el perfil de Twitch.".into());
+    }
+    let users: HelixResponse<HelixUser> = users_response
+        .json()
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(users.data)
+}
+
 #[tauri::command]
 pub async fn refresh_talents(app: tauri::AppHandle) -> Result<Vec<TalentSnapshot>, String> {
     use tauri::Manager;
@@ -567,7 +636,16 @@ pub async fn refresh_talents(app: tauri::AppHandle) -> Result<Vec<TalentSnapshot
     let db_path = app_dir.join("neuragest.db");
     let previous: Option<Vec<TalentSnapshot>> =
         crate::db::read_cache(&db_path, "twitch-talents").ok().flatten();
-    let previous_followers: HashMap<String, u64> = previous
+    let previous_followers_by_id: HashMap<String, u64> = previous
+        .as_ref()
+        .map(|rows| {
+            rows.iter()
+                .filter(|row| row.followers > 0)
+                .map(|row| (row.id.clone(), row.followers))
+                .collect()
+        })
+        .unwrap_or_default();
+    let previous_followers_by_login: HashMap<String, u64> = previous
         .as_ref()
         .map(|rows| {
             rows.iter()
@@ -577,68 +655,119 @@ pub async fn refresh_talents(app: tauri::AppHandle) -> Result<Vec<TalentSnapshot
         })
         .unwrap_or_default();
 
-    let mut users_url = url::Url::parse("https://api.twitch.tv/helix/users").map_err(|error| error.to_string())?;
-    for login in TALENTS { users_url.query_pairs_mut().append_pair("login", login); }
-    let users_response = client.get(users_url)
-        .header("Client-Id", &client_id).bearer_auth(&access_token)
-        .send().await.map_err(|error| {
-            tracing::warn!(%error, "Error consultando perfiles Twitch");
-            "No se pudo consultar perfiles de Twitch.".to_string()
-        })?;
-    if !users_response.status().is_success() {
-        tracing::warn!(status = %users_response.status(), "Twitch rechazó consulta de perfiles");
-        return Err("No se pudo obtener el perfil de Twitch.".into());
-    }
-    let users: HelixResponse<HelixUser> = users_response.json().await.map_err(|error| error.to_string())?;
+    let targets = crate::twitch::roster::load_roster_targets().await;
+    let helix_users =
+        fetch_helix_users_for_roster(&client, &client_id, &access_token, &targets).await?;
 
-    let mut streams_url = url::Url::parse("https://api.twitch.tv/helix/streams").map_err(|error| error.to_string())?;
-    for login in TALENTS { streams_url.query_pairs_mut().append_pair("user_login", login); }
-    let streams_response = client.get(streams_url)
-        .header("Client-Id", &client_id).bearer_auth(&access_token)
-        .send().await.map_err(|error| {
-            tracing::warn!(%error, "Error consultando transmisiones en vivo");
-            "No se pudo consultar transmisiones en vivo.".to_string()
-        })?;
-    if !streams_response.status().is_success() {
-        tracing::warn!(status = %streams_response.status(), "Twitch rechazó consulta de streams");
-        return Err("No se pudo consultar el estado en vivo de Twitch.".into());
-    }
-    let streams: HelixResponse<HelixStream> = streams_response.json().await.map_err(|error| error.to_string())?;
-    let live_by_login: HashMap<String, HelixStream> = streams.data.into_iter()
-        .map(|stream| (stream.user_login.to_lowercase(), stream))
+    let users_by_id: HashMap<String, HelixUser> = helix_users
+        .iter()
+        .map(|user| (user.id.clone(), user.clone()))
         .collect();
-
-    let users_by_login: HashMap<String, HelixUser> = users.data.into_iter()
+    let users_by_login: HashMap<String, HelixUser> = helix_users
+        .into_iter()
         .map(|user| (user.login.to_lowercase(), user))
         .collect();
+
+    // GET /streams por user_id (App Token) — funciona para toda la cartera sin OAuth por canal.
+    let live_by_user_id: HashMap<String, HelixStream> = if users_by_id.is_empty() {
+        HashMap::new()
+    } else {
+        let mut streams_url = url::Url::parse("https://api.twitch.tv/helix/streams").map_err(|error| error.to_string())?;
+        for user in users_by_id.values() {
+            streams_url.query_pairs_mut().append_pair("user_id", &user.id);
+        }
+        let streams_response = client.get(streams_url)
+            .header("Client-Id", &client_id).bearer_auth(&access_token)
+            .send().await.map_err(|error| {
+                tracing::warn!(%error, "Error consultando transmisiones en vivo");
+                "No se pudo consultar transmisiones en vivo.".to_string()
+            })?;
+        if !streams_response.status().is_success() {
+            tracing::warn!(status = %streams_response.status(), "Twitch rechazó consulta de streams");
+            return Err("No se pudo consultar el estado en vivo de Twitch.".into());
+        }
+        let streams: HelixResponse<HelixStream> = streams_response.json().await.map_err(|error| error.to_string())?;
+        streams
+            .data
+            .into_iter()
+            .map(|stream| (stream.user_id.clone(), stream))
+            .collect()
+    };
+    tracing::info!(
+        live_count = live_by_user_id.len(),
+        roster = users_by_id.len(),
+        targets = targets.len(),
+        "Helix /streams cartera"
+    );
+
     let followers_by_login =
         fetch_follower_totals(&client, &client_id, &access_token, &users_by_login).await;
 
-    let snapshots: Vec<TalentSnapshot> = TALENTS.iter().filter_map(|login| {
-        let user = users_by_login.get(*login)?;
-        let stream = live_by_login.get(*login);
-        let followers = followers_by_login
-            .get(*login)
-            .copied()
-            .or_else(|| previous_followers.get(*login).copied())
-            .unwrap_or(0);
-        Some(TalentSnapshot {
-            id: user.id.clone(),
-            login: user.login.clone(),
-            display_name: if user.login.eq_ignore_ascii_case("nosomevt") { "Nosome".into() } else { user.display_name.clone() },
-            avatar: user.profile_image_url.clone(),
-            description: user.description.clone(),
-            is_live: stream.is_some(),
-            viewers: stream.map_or(0, |value| value.viewer_count),
-            followers,
-            category: stream.map_or_else(|| "Offline".into(), |value| value.game_name.clone()),
-            title: stream.map_or_else(String::new, |value| value.title.clone()),
-            created_at: user.created_at.clone(),
-            stream_id: stream.map(|value| value.id.clone()),
-            started_at: stream.map(|value| value.started_at.clone()),
-            offline_image_url: user.offline_image_url.clone(),
+    // GET /helix/channels → tags, idioma, CCL (App Token).
+    let channel_by_user_id: HashMap<String, crate::twitch::helix_ops::ChannelInfoRow> =
+        match crate::twitch::helix_ops::fetch_channels_for_roster(&app).await {
+            Ok(rows) => rows
+                .into_iter()
+                .map(|row| (row.broadcaster_id.clone(), row))
+                .collect(),
+            Err(error) => {
+                tracing::warn!(%error, "No se pudo enriquecer canales Helix");
+                HashMap::new()
+            }
+        };
+
+    let mut seen_user_ids = std::collections::HashSet::new();
+    let snapshots: Vec<TalentSnapshot> = targets
+        .iter()
+        .filter_map(|target| {
+            let user = target
+                .twitch_user_id
+                .as_ref()
+                .and_then(|id| users_by_id.get(id))
+                .or_else(|| users_by_login.get(&target.login.to_lowercase()))?;
+            if !seen_user_ids.insert(user.id.clone()) {
+                return None;
+            }
+            let login_key = user.login.to_lowercase();
+            let stream = live_by_user_id.get(&user.id);
+            let channel = channel_by_user_id.get(&user.id);
+            let followers = followers_by_login
+                .get(&login_key)
+                .copied()
+                .or_else(|| previous_followers_by_id.get(&user.id).copied())
+                .or_else(|| previous_followers_by_login.get(&login_key).copied())
+                .or_else(|| previous_followers_by_login.get(&target.login.to_lowercase()).copied())
+                .unwrap_or(0);
+            Some(TalentSnapshot {
+                id: user.id.clone(),
+                login: user.login.clone(),
+                display_name: display_name_for_talent(&user.login, &user.display_name),
+                avatar: user.profile_image_url.clone(),
+                description: user.description.clone(),
+                is_live: stream.is_some(),
+                viewers: stream.map_or(0, |value| value.viewer_count),
+                followers,
+                category: stream
+                    .map(|value| value.game_name.clone())
+                    .or_else(|| channel.map(|c| c.game_name.clone()))
+                    .filter(|value| !value.is_empty())
+                    .unwrap_or_else(|| "Offline".into()),
+                title: stream
+                    .map(|value| value.title.clone())
+                    .or_else(|| channel.map(|c| c.title.clone()))
+                    .unwrap_or_default(),
+                created_at: user.created_at.clone(),
+                stream_id: stream.map(|value| value.id.clone()),
+                started_at: stream.map(|value| value.started_at.clone()),
+                offline_image_url: user.offline_image_url.clone(),
+                tags: channel.map(|c| c.tags.clone()).unwrap_or_default(),
+                language: channel.map(|c| c.language.clone()).unwrap_or_default(),
+                content_classification_labels: channel
+                    .map(|c| c.content_classification_labels.clone())
+                    .unwrap_or_default(),
+            })
         })
-    }).collect();
+        .collect();
 
     crate::db::save_cache(&db_path, "twitch-talents", "talents", &snapshots)?;
 
@@ -672,13 +801,204 @@ pub async fn fetch_metric_snapshots(
 pub async fn fetch_stream_events(
     hours: Option<u32>,
     login: Option<String>,
-) -> Result<Vec<serde_json::Value>, String> {
+) -> Result<Vec<crate::twitch::metrics::StreamEventRow>, String> {
     crate::twitch::metrics::fetch_stream_events(hours.unwrap_or(168), login.as_deref()).await
 }
 
 #[tauri::command]
 pub async fn eventsub_status() -> Result<crate::twitch::eventsub::EventSubStatus, String> {
     Ok(crate::twitch::eventsub::eventsub_status().await)
+}
+
+#[tauri::command]
+pub async fn fetch_channel_info(
+    app: tauri::AppHandle,
+    login: String,
+) -> Result<crate::twitch::helix_ops::ChannelInfoRow, String> {
+    crate::twitch::helix_ops::fetch_channel_info(&app, &login).await
+}
+
+#[tauri::command]
+pub async fn create_twitch_clip(
+    app: tauri::AppHandle,
+    login: String,
+) -> Result<crate::twitch::helix_ops::CreatedClipRow, String> {
+    crate::twitch::helix_ops::create_clip(&app, &login).await
+}
+
+#[tauri::command]
+pub async fn fetch_subscription_kpi(
+    app: tauri::AppHandle,
+    login: String,
+) -> Result<crate::twitch::helix_ops::SubscriptionKpiRow, String> {
+    crate::twitch::helix_ops::fetch_subscription_kpi(&app, &login).await
+}
+
+#[tauri::command]
+pub async fn fetch_portfolio_subscription_kpi(
+    app: tauri::AppHandle,
+) -> Result<crate::twitch::helix_ops::PortfolioSubscriptionKpi, String> {
+    crate::twitch::helix_ops::fetch_portfolio_subscription_kpi(&app).await
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedReportExport {
+    pub path: String,
+    pub filename: String,
+}
+
+fn sanitize_export_filename(filename: &str) -> Result<String, String> {
+    let safe_name = filename
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>();
+    if safe_name.is_empty() || safe_name.len() > 180 {
+        return Err("Nombre de archivo no válido.".into());
+    }
+    Ok(safe_name)
+}
+
+/// Abre path/URL con la app por defecto.
+/// Desde Rust (sin scope JS) sí admite rutas locales; `shell.open` desde
+/// el frontend solo permite mailto/tel/http(s) por defecto.
+fn open_path_default_app(app: &tauri::AppHandle, path: &std::path::Path) -> Result<(), String> {
+    use tauri_plugin_shell::ShellExt;
+
+    let path_str = path.to_string_lossy().into_owned();
+    #[allow(deprecated)]
+    app.shell()
+        .open(path_str, None)
+        .map_err(|e| format!("No se pudo abrir «{}»: {e}", path.display()))
+}
+
+/// Guarda un export (HTML/CSV/PDF) en la carpeta Descargas del usuario.
+#[tauri::command]
+pub async fn save_report_export(
+    app: tauri::AppHandle,
+    filename: String,
+    contents: String,
+    encoding: Option<String>,
+) -> Result<SavedReportExport, String> {
+    use tauri::Manager;
+
+    let safe_name = sanitize_export_filename(&filename)?;
+
+    let dir = app
+        .path()
+        .download_dir()
+        .map_err(|e| format!("No se pudo resolver Descargas: {e}"))?;
+    tokio::fs::create_dir_all(&dir)
+        .await
+        .map_err(|e| format!("No se pudo crear Descargas: {e}"))?;
+
+    let path = dir.join(&safe_name);
+    let bytes = match encoding.as_deref().unwrap_or("utf8") {
+        "base64" => {
+            use base64::Engine;
+            base64::engine::general_purpose::STANDARD
+                .decode(contents.trim())
+                .map_err(|e| format!("Contenido base64 inválido: {e}"))?
+        }
+        _ => contents.into_bytes(),
+    };
+    tokio::fs::write(&path, bytes)
+        .await
+        .map_err(|e| format!("No se pudo guardar el reporte: {e}"))?;
+
+    Ok(SavedReportExport {
+        path: path.display().to_string(),
+        filename: safe_name,
+    })
+}
+
+/// Resuelve Descargas, la crea si falta y la abre en el explorador.
+#[tauri::command]
+pub async fn reveal_downloads_dir(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri::Manager;
+
+    let dir = app
+        .path()
+        .download_dir()
+        .map_err(|e| format!("No se pudo resolver Descargas: {e}"))?;
+    tokio::fs::create_dir_all(&dir)
+        .await
+        .map_err(|e| format!("No se pudo crear Descargas: {e}"))?;
+    open_path_default_app(&app, &dir)?;
+    Ok(dir.display().to_string())
+}
+
+/// Escribe HTML de vista previa en temp y lo abre con el visor/navegador por defecto.
+#[tauri::command]
+pub async fn open_report_preview(
+    app: tauri::AppHandle,
+    html: String,
+    filename: Option<String>,
+) -> Result<String, String> {
+    if html.trim().is_empty() {
+        return Err("El reporte HTML está vacío.".into());
+    }
+    let safe_name = sanitize_export_filename(
+        filename
+            .as_deref()
+            .unwrap_or("neuragest-senal-preview.html"),
+    )?;
+    let safe_name = if safe_name.to_ascii_lowercase().ends_with(".html") {
+        safe_name
+    } else {
+        format!("{safe_name}.html")
+    };
+
+    let dir = std::env::temp_dir().join("NeuraGest").join("previews");
+    tokio::fs::create_dir_all(&dir)
+        .await
+        .map_err(|e| format!("No se pudo crear carpeta temporal: {e}"))?;
+    let path = dir.join(&safe_name);
+    tokio::fs::write(&path, html.as_bytes())
+        .await
+        .map_err(|e| format!("No se pudo escribir la vista previa: {e}"))?;
+    open_path_default_app(&app, &path)?;
+    Ok(path.display().to_string())
+}
+
+#[tauri::command]
+pub async fn fetch_chatters_count(
+    app: tauri::AppHandle,
+    login: String,
+    viewers: Option<u64>,
+) -> Result<crate::twitch::helix_ops::ChattersRow, String> {
+    crate::twitch::helix_ops::fetch_chatters_count(&app, &login, viewers.unwrap_or(0)).await
+}
+
+#[tauri::command]
+pub async fn fetch_ads_schedule(
+    app: tauri::AppHandle,
+    login: String,
+) -> Result<crate::twitch::helix_ops::AdsScheduleRow, String> {
+    crate::twitch::helix_ops::fetch_ads_schedule(&app, &login).await
+}
+
+#[tauri::command]
+pub async fn fetch_creator_goals(
+    app: tauri::AppHandle,
+    login: String,
+) -> Result<crate::twitch::helix_ops::GoalsRow, String> {
+    crate::twitch::helix_ops::fetch_creator_goals(&app, &login).await
+}
+
+#[tauri::command]
+pub async fn fetch_live_extras(
+    app: tauri::AppHandle,
+    login: String,
+    viewers: Option<u64>,
+) -> Result<crate::twitch::helix_ops::LiveExtrasRow, String> {
+    crate::twitch::helix_ops::fetch_live_extras(&app, &login, viewers.unwrap_or(0)).await
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -1331,4 +1651,31 @@ pub async fn open_twitch_channel_window(
         .map_err(|e| format!("No se pudo abrir la ventana de Twitch: {e}"))?;
 
     Ok(())
+}
+
+// ─── VRChat Groups (API comunitaria) ─────────────────────────────────────────
+
+#[tauri::command]
+pub fn vrchat_config_status() -> crate::vrchat::VrchatConfigStatus {
+    crate::vrchat::config_status()
+}
+
+#[tauri::command]
+pub async fn sync_vrchat_group() -> Result<crate::vrchat::VrchatGroupSyncResult, String> {
+    crate::vrchat::sync_group().await
+}
+
+#[tauri::command]
+pub async fn verify_vrchat_2fa(
+    code: String,
+    method: Option<String>,
+) -> Result<crate::vrchat::VrchatGroupSyncResult, String> {
+    crate::vrchat::verify_two_factor(code, method).await
+}
+
+#[tauri::command]
+pub async fn fetch_vrchat_group_snapshots(
+    limit: Option<u32>,
+) -> Result<Vec<crate::vrchat::VrchatGroupSnapshotRow>, String> {
+    crate::vrchat::fetch_snapshots(limit.unwrap_or(10)).await
 }

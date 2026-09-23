@@ -15,10 +15,12 @@ export type MetricSnapshot = {
 export type StreamEvent = {
   id: number
   login: string
-  eventType: 'stream.online' | 'stream.offline'
+  eventType: string
   streamId: string | null
   categoryName: string | null
   title: string | null
+  /** Fragmento EventSub (raid / shared chat) cuando existe. */
+  payload?: Record<string, unknown> | null
   occurredAt: string
 }
 
@@ -27,6 +29,9 @@ export type EventSubStatus = {
   sessionId: string | null
   subscriptions: number
   lastEventAt: string | null
+  richEnabled?: boolean
+  lastError?: string | null
+  activeConnections?: number
 }
 
 export type WeeklyTalentMetrics = {
@@ -69,14 +74,20 @@ type RawSnapshot = {
   capturedAt: string
 }
 
+/** Acepta camelCase (Tauri) o snake_case (filas crudas de Supabase). */
 type RawStreamEvent = {
   id: number
   login: string
-  eventType: string
+  eventType?: string
+  event_type?: string
   streamId?: string | null
+  stream_id?: string | null
   categoryName?: string | null
+  category_name?: string | null
   title?: string | null
-  occurredAt: string
+  payload?: Record<string, unknown> | null
+  occurredAt?: string
+  occurred_at?: string
 }
 
 function mapSnapshot(row: RawSnapshot): MetricSnapshot {
@@ -92,15 +103,20 @@ function mapSnapshot(row: RawSnapshot): MetricSnapshot {
   }
 }
 
-function mapStreamEvent(row: RawStreamEvent): StreamEvent {
+/** Exportado para tests: normaliza eventos y descarta filas incompletas. */
+export function mapStreamEvent(row: RawStreamEvent): StreamEvent | null {
+  const occurredAt = row.occurredAt ?? row.occurred_at
+  const eventType = row.eventType ?? row.event_type
+  if (!row.login || !eventType || !occurredAt) return null
   return {
     id: row.id,
     login: row.login,
-    eventType: row.eventType as StreamEvent['eventType'],
-    streamId: row.streamId ?? null,
-    categoryName: row.categoryName ?? null,
+    eventType,
+    streamId: row.streamId ?? row.stream_id ?? null,
+    categoryName: row.categoryName ?? row.category_name ?? null,
     title: row.title ?? null,
-    occurredAt: row.occurredAt,
+    payload: row.payload ?? null,
+    occurredAt,
   }
 }
 
@@ -113,7 +129,10 @@ export async function fetchMetricSnapshots(hours = 168, login?: string): Promise
 export async function fetchStreamEvents(hours = 168, login?: string): Promise<StreamEvent[]> {
   if (!isTauri) return []
   const rows = await invoke<RawStreamEvent[]>('fetch_stream_events', { hours, login: login ?? null })
-  return rows.map(mapStreamEvent)
+  return rows.flatMap((row) => {
+    const mapped = mapStreamEvent(row)
+    return mapped ? [mapped] : []
+  })
 }
 
 export async function fetchEventSubStatus(): Promise<EventSubStatus | null> {

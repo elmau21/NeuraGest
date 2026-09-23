@@ -18,7 +18,9 @@ function eventSubLabel(status: EventSubStatus | null) {
   switch (status.state) {
     case 'connected': return `Tiempo real · ${status.subscriptions} suscripciones activas`
     case 'connecting': return 'Conectando tiempo real…'
-    case 'fallback_polling': return 'Tiempo real en pausa · actualización cada 60s'
+    case 'fallback_polling': return status.lastError
+      ? `Modo alterno · ${status.lastError}`
+      : 'Tiempo real en pausa · actualización cada 60s'
     default: return 'Tiempo real desconectado · actualización cada 60s'
   }
 }

@@ -1,4 +1,3 @@
-use crate::commands::TALENTS;
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -224,12 +223,14 @@ async fn fetch_channel_summary(login: &str) -> Result<(ChannelSummaryResponse, V
 
 pub async fn sync_all_talents() -> Result<TwitchTrackerSyncResult, String> {
     let synced_at = chrono::Utc::now().to_rfc3339();
-    let id_by_login = fetch_talent_ids_by_login(&TALENTS).await?;
+    let roster_logins = crate::twitch::roster::current_roster_logins().await;
+    let login_refs: Vec<&str> = roster_logins.iter().map(String::as_str).collect();
+    let id_by_login = fetch_talent_ids_by_login(&login_refs).await?;
     let mut upserts: Vec<Value> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
     let mut skipped = 0u32;
 
-    for (index, login) in TALENTS.iter().enumerate() {
+    for (index, login) in roster_logins.iter().enumerate() {
         if index > 0 {
             tokio::time::sleep(Duration::from_millis(REQUEST_DELAY_MS)).await;
         }

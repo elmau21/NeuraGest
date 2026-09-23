@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, Plus, RefreshCw } from '@/components/icons'
+import { Download, Plus, RefreshCw, Trophy } from '@/components/icons'
+import { EmptyState } from '@/components/EmptyState'
 import {
   exportLeagueBoardPack,
   listCandidates,
@@ -176,14 +177,31 @@ export function NeuraLeagueOverviewPage() {
                     <small>{s.status} · {s.slug}</small>
                   </button>
                 ))}
-                {seasons.length === 0 && <p className="empty-state">Sin temporadas aún.</p>}
+                {seasons.length === 0 && (
+                  <EmptyState
+                    icon={Trophy}
+                    title="Sin temporadas"
+                    description="Crea la primera edición para armar equipos, jugadores y calendario de liga."
+                  >
+                    {!readonly ? (
+                      <button type="button" className="primary" onClick={() => void createSeason()}>
+                        <Plus size={16} /> Crear temporada
+                      </button>
+                    ) : null}
+                  </EmptyState>
+                )}
               </div>
             </div>
 
             <div className="card">
               <div className="card-head"><h3>Detalle de temporada</h3></div>
               {!selected ? (
-                <p className="empty-state">Selecciona o crea una temporada.</p>
+                <EmptyState
+                  title="Ninguna temporada seleccionada"
+                  description={seasons.length === 0
+                    ? 'Cuando exista una temporada, elige una en la lista para editar reglamento y fechas.'
+                    : 'Selecciona una temporada de la lista para ver su detalle.'}
+                />
               ) : (
                 <div className="nl-form">
                   <label>Nombre<input disabled={readonly} value={selected.name} onChange={(e) => setSelected({ ...selected, name: e.target.value })} /></label>

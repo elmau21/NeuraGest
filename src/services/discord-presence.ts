@@ -94,6 +94,8 @@ export function presenceLabelForPath(pathname: string): string {
     '/ciencia-datos': 'Ciencia de datos',
     '/estadisticas': 'Estadísticas',
     '/analitica': 'Analítica',
+    '/senal': 'Señal Pulse',
+    '/senal/coordinacion': 'Coordinación',
     '/auditoria': 'Auditoría',
     '/ajustes': 'Ajustes',
   }

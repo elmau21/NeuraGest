@@ -35,6 +35,10 @@ import {
 import { useAppStore } from '@/stores/app-store'
 import { fetchMetricSnapshots, fetchStreamEvents, type MetricSnapshot, type StreamEvent } from '@/services/metrics'
 import { fetchTwitchTrackerSnapshots, type TwitchTrackerSnapshot } from '@/services/twitchtracker'
+import {
+  fetchInstagramSnapshotForLogin,
+  type InstagramMonthlySnapshot,
+} from '@/services/instagram-monthly'
 import { collectTalentMetrics, fetchStreamSessions, fetchTalentVods } from '@/services/talent-collector'
 import type { StreamSessionRecord, TalentVodRecord } from '@/services/external-stats'
 import { listClips, type ClipRecord } from '@/services/ops'
@@ -141,6 +145,7 @@ export function TalentProfilePage() {
   const [vods, setVods] = useState<TalentVodRecord[]>([])
   const [sessions, setSessions] = useState<StreamSessionRecord[]>([])
   const [clips, setClips] = useState<ClipRecord[]>([])
+  const [igSnapshot, setIgSnapshot] = useState<InstagramMonthlySnapshot | null>(null)
   const [loading, setLoading] = useState(false)
   const [collecting, setCollecting] = useState(false)
   const [collectNote, setCollectNote] = useState<string | null>(null)
@@ -157,13 +162,14 @@ export function TalentProfilePage() {
     setLoading(true)
     setError(null)
     try {
-      const [metricRows, eventRows, ttRows, vodRows, sessionRows, clipRows] = await Promise.all([
+      const [metricRows, eventRows, ttRows, vodRows, sessionRows, clipRows, igRow] = await Promise.all([
         fetchMetricSnapshots(8760, login),
         fetchStreamEvents(8760, login),
         fetchTwitchTrackerSnapshots(8760),
         fetchTalentVods(login, 90),
         fetchStreamSessions(8760, login),
         listClips(200),
+        fetchInstagramSnapshotForLogin(login).catch(() => null),
       ])
       setSnapshots(metricRows.sort(
         (a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime(),
@@ -175,6 +181,7 @@ export function TalentProfilePage() {
       setClips(clipRows.filter(
         (clip) => clip.talentLogin?.toLowerCase() === login || clip.talentId === talent?.id,
       ))
+      setIgSnapshot(igRow)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -347,7 +354,7 @@ export function TalentProfilePage() {
           delta={performance.deltas.hoursStreamed}
           source={src.hoursStreamed}
           meta="Tiempo real → sesiones → repeticiones → TT"
-          tone="purple"
+          tone="accent"
         />
         <PerformanceCard
           label="Viewers promedio"
@@ -387,7 +394,7 @@ export function TalentProfilePage() {
           delta={performance.deltas.followersPerHour}
           source={src.followersPerHour}
           meta="Crecimiento / horas stream"
-          tone="purple"
+          tone="accent"
         />
         <PerformanceCard
           label="Categorías jugadas"
@@ -414,6 +421,15 @@ export function TalentProfilePage() {
           <article><span>Pico histórico CCV</span><strong>{formatStat(lifetime.highestViewers)}</strong></article>
           <article><span>Followers Twitch</span><strong>{formatCompact(lifetime.followersHelix)}</strong></article>
           <article><span>Followers (externo)</span><strong>{formatCompact(lifetime.followersTt)}</strong></article>
+          <article>
+            <span>IG followers{igSnapshot ? ` · @${igSnapshot.instagramHandle}` : ''}</span>
+            <strong>{igSnapshot ? formatCompact(igSnapshot.followers) : '—'}</strong>
+            <small>
+              {igSnapshot
+                ? `Mensual ${igSnapshot.snapshotMonth.slice(0, 7)}`
+                : 'Sin snapshot IG mensual'}
+            </small>
+          </article>
           <article><span>Categorías lifetime</span><strong>{formatStat(lifetime.gamesCount)}</strong></article>
           <article><span>Clips indexados</span><strong>{formatStat(lifetime.totalClips)}</strong><small>{formatStat(lifetime.clipViews)} views</small></article>
         </div>

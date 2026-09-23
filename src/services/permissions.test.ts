@@ -42,7 +42,7 @@ describe('nav por rol', () => {
     expect(canAccessPath(['owner', 'dev'], '/crm')).toBe(true)
   })
 
-  it('solo dev: solo Inteligencia, Ciencia, Estadísticas y Analítica', () => {
+  it('solo dev: Señal Pulse, Inteligencia, Ciencia, Estadísticas y Analítica', () => {
     expect(isDevOnlyNav(['dev'])).toBe(true)
     for (const path of DEV_ALLOWED_PATHS) {
       expect(canAccessPath(['dev'], path)).toBe(true)
@@ -62,9 +62,9 @@ describe('nav por rol', () => {
     expect(canAccessPath(['staff', 'dev'], '/talentos')).toBe(true)
   })
 
-  it('maufuwari siempre tiene nav completa', () => {
-    expect(isDevOnlyNav(['dev'], 'maufuwari')).toBe(false)
-    expect(canAccessPath(['dev'], '/ajustes', 'maufuwari')).toBe(true)
+  it('elmauwiii siempre tiene nav completa', () => {
+    expect(isDevOnlyNav(['dev'], 'elmauwiii')).toBe(false)
+    expect(canAccessPath(['dev'], '/ajustes', 'elmauwiii')).toBe(true)
   })
 
   it('solo designer: War Room + Diseño (sin Dashboard/Ajustes/Ops resto)', () => {

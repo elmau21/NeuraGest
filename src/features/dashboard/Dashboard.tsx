@@ -101,7 +101,7 @@ export function Dashboard() {
   const kpis = [
     { label: 'Talentos', value: number.format(filtered.length), meta: `${talents.length} en cartera`, icon: Users, tone: 'blue' },
     { label: 'En directo', value: number.format(liveTalents.length), meta: liveTalents.length ? 'Emitiendo ahora' : 'Sin emisiones', icon: Activity, tone: 'live' },
-    { label: 'Viewers totales', value: number.format(totalViewers), meta: 'Audiencia simultánea', icon: Eye, tone: 'purple' },
+    { label: 'Viewers totales', value: number.format(totalViewers), meta: 'Audiencia simultánea', icon: Eye, tone: 'accent' },
     { label: 'Promedio live', value: number.format(averageViewers), meta: 'Por canal activo', icon: Radio, tone: 'cyan' },
     { label: 'Offline', value: number.format(filtered.length - liveTalents.length), meta: 'Canales inactivos', icon: WifiOff, tone: 'neutral' },
     { label: 'Actualización', value: lastUpdateLabel, meta: helixStatus === 'connected' ? 'Conexión Twitch' : 'Estado de conexión', icon: Clock3, tone: 'amber' },

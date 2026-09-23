@@ -20,7 +20,7 @@ type OwnerAssistantPanelProps = {
 }
 
 function canConfigurePairing(roles: string[], login?: string | null): boolean {
-  if (login?.toLowerCase() === 'maufuwari') return true
+  if (login?.toLowerCase() === 'elmauwiii') return true
   return roles.includes('owner') || roles.includes('admin')
 }
 

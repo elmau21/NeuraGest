@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { formatActivityLabel, resolveActorLogin, resolveActorName } from './activity-format'
+import {
+  formatActivityLabel,
+  formatEventSubTypeLabel,
+  resolveActorLogin,
+  resolveActorName,
+} from './activity-format'
 
 describe('resolveActorName', () => {
   it('prioriza display_name del join', () => {
     expect(
       resolveActorName(
-        { display_name: 'MauFuwari', twitch_login: 'maufuwari' },
+        { display_name: 'elmauwiii', twitch_login: 'elmauwiii' },
         { actorName: 'Otro' },
       ),
-    ).toBe('MauFuwari')
+    ).toBe('elmauwiii')
   })
 
   it('usa login Twitch si no hay display_name', () => {
@@ -32,11 +37,30 @@ describe('resolveActorLogin', () => {
   })
 })
 
+describe('formatEventSubTypeLabel', () => {
+  it('mapea tipos EventSub a labels legibles', () => {
+    expect(formatEventSubTypeLabel('stream.online')).toBe('En vivo')
+    expect(formatEventSubTypeLabel('stream.offline')).toBe('Offline')
+    expect(formatEventSubTypeLabel('channel.update')).toBe('Actualización')
+    expect(formatEventSubTypeLabel('channel.follow')).toBe('Follow')
+    expect(formatEventSubTypeLabel('channel.subscribe')).toBe('Sub')
+    expect(formatEventSubTypeLabel('channel.subscription.gift')).toBe('Sub')
+    expect(formatEventSubTypeLabel('channel.raid')).toBe('Raid')
+    expect(formatEventSubTypeLabel('channel.shared_chat.begin')).toBe('Shared chat')
+    expect(formatEventSubTypeLabel('channel.shared_chat.end')).toBe('Shared chat')
+  })
+
+  it('cubre prefijos subscribe / shared_chat desconocidos', () => {
+    expect(formatEventSubTypeLabel('channel.subscription.message')).toBe('Sub')
+    expect(formatEventSubTypeLabel('channel.shared_chat.update')).toBe('Shared chat')
+  })
+})
+
 describe('formatActivityLabel', () => {
   it('incluye quién abrió el contrato', () => {
     expect(
-      formatActivityLabel('contract', 'viewed', { fileName: 'a.pdf' }, 'MauFuwari'),
-    ).toBe('MauFuwari abrió el contrato «a.pdf»')
+      formatActivityLabel('contract', 'viewed', { fileName: 'a.pdf' }, 'elmauwiii'),
+    ).toBe('elmauwiii abrió el contrato «a.pdf»')
   })
 
   it('incluye quién descargó / borró / subió', () => {

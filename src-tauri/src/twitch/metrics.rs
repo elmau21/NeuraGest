@@ -34,6 +34,8 @@ struct MetricSnapshotDbRow {
 struct TalentIdRow {
     id: String,
     login: String,
+    #[serde(default)]
+    twitch_user_id: Option<String>,
 }
 
 fn supabase_config() -> Result<(String, String), String> {
@@ -79,13 +81,9 @@ async fn supabase_request(
         })
 }
 
-async fn fetch_talent_ids_by_login(logins: &[String]) -> Result<std::collections::HashMap<String, String>, String> {
-    if logins.is_empty() {
-        return Ok(std::collections::HashMap::new());
-    }
-    let ids = logins.join(",");
+async fn fetch_all_talent_keys() -> Result<Vec<TalentIdRow>, String> {
     let query = format!(
-        "/rest/v1/talents?select=id,login&organization_id=eq.{DEFAULT_ORG_ID}&login=in.({ids})"
+        "/rest/v1/talents?select=id,login,twitch_user_id&organization_id=eq.{DEFAULT_ORG_ID}&deleted_at=is.null"
     );
     let response = supabase_request(Method::GET, &query, None, None, &[]).await?;
     let status = response.status();
@@ -94,15 +92,125 @@ async fn fetch_talent_ids_by_login(logins: &[String]) -> Result<std::collections
         tracing::warn!(%status, %body, "No se pudieron leer talentos");
         return Err("No se pudieron leer los talentos. Intenta de nuevo.".into());
     }
-    let rows: Vec<TalentIdRow> =
-        serde_json::from_str(&body).map_err(|e| {
-            tracing::warn!(%e, %body, "Respuesta de talentos no interpretable");
-            "No se pudieron interpretar los datos de talentos.".to_string()
-        })?;
+    serde_json::from_str(&body).map_err(|e| {
+        tracing::warn!(%e, %body, "Respuesta de talentos no interpretable");
+        "No se pudieron interpretar los datos de talentos.".to_string()
+    })
+}
+
+async fn fetch_talent_ids_by_login(logins: &[String]) -> Result<std::collections::HashMap<String, String>, String> {
+    if logins.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let rows = fetch_all_talent_keys().await?;
+    let wanted: std::collections::HashSet<String> =
+        logins.iter().map(|l| l.to_lowercase()).collect();
     Ok(rows
         .into_iter()
+        .filter(|row| wanted.contains(&row.login.to_lowercase()))
         .map(|row| (row.login.to_lowercase(), row.id))
         .collect())
+}
+
+/// Sincroniza login / display_name / avatar por `twitch_user_id` (sobrevive renames).
+async fn sync_talent_profiles_from_snapshots(snapshots: &[TalentSnapshot]) -> Result<(), String> {
+    if snapshots.is_empty() {
+        return Ok(());
+    }
+    let existing = fetch_all_talent_keys().await.unwrap_or_default();
+    let by_twitch_id: std::collections::HashMap<String, String> = existing
+        .iter()
+        .filter_map(|row| {
+            row.twitch_user_id
+                .as_ref()
+                .filter(|id| !id.is_empty())
+                .map(|id| (id.clone(), row.id.clone()))
+        })
+        .collect();
+    let by_login: std::collections::HashMap<String, String> = existing
+        .iter()
+        .map(|row| (row.login.to_lowercase(), row.id.clone()))
+        .collect();
+
+    let captured_at = chrono::Utc::now().to_rfc3339();
+    let mut patch_ok = 0usize;
+    let mut insert_payloads: Vec<Value> = Vec::new();
+
+    for snapshot in snapshots {
+        let display_name = if snapshot.login.eq_ignore_ascii_case("nosomevt") {
+            "Nosome"
+        } else {
+            snapshot.display_name.as_str()
+        };
+        let profile = json!({
+            "twitch_user_id": snapshot.id,
+            "login": snapshot.login,
+            "display_name": display_name,
+            "avatar_url": snapshot.avatar,
+            "description": snapshot.description,
+            "twitch_created_at": snapshot.created_at,
+            "metadata": {
+                "is_live": snapshot.is_live,
+                "viewers": snapshot.viewers,
+                "category": snapshot.category,
+                "title": snapshot.title,
+                "tags": snapshot.tags,
+                "language": snapshot.language,
+                "content_classification_labels": snapshot.content_classification_labels,
+                "last_twitch_sync_at": captured_at,
+            },
+            "deleted_at": Value::Null,
+            "updated_at": captured_at,
+        });
+
+        let talent_pk = by_twitch_id
+            .get(&snapshot.id)
+            .cloned()
+            .or_else(|| by_login.get(&snapshot.login.to_lowercase()).cloned());
+
+        if let Some(pk) = talent_pk {
+            let response = supabase_request(
+                Method::PATCH,
+                "/rest/v1/talents",
+                Some(&format!("?id=eq.{pk}")),
+                Some(profile),
+                &[("Prefer", "return=minimal")],
+            )
+            .await?;
+            if response.status().is_success() {
+                patch_ok += 1;
+            } else {
+                let status = response.status();
+                let body = response.text().await.unwrap_or_default();
+                tracing::warn!(%status, %body, login = %snapshot.login, "Falló PATCH de talento tras sync Helix");
+            }
+        } else {
+            let mut insert = profile;
+            if let Some(obj) = insert.as_object_mut() {
+                obj.insert("organization_id".into(), json!(DEFAULT_ORG_ID));
+            }
+            insert_payloads.push(insert);
+        }
+    }
+
+    if !insert_payloads.is_empty() {
+        let response = supabase_request(
+            Method::POST,
+            "/rest/v1/talents",
+            Some("?on_conflict=twitch_user_id"),
+            Some(Value::Array(insert_payloads)),
+            &[("Prefer", "resolution=merge-duplicates,return=minimal")],
+        )
+        .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            tracing::warn!(%status, %body, "Falló upsert de talentos nuevos por twitch_user_id");
+        }
+    }
+
+    tracing::info!(patch_ok, "Perfiles de talentos sincronizados desde Helix");
+    Ok(())
 }
 
 pub async fn persist_metric_snapshots(snapshots: &[TalentSnapshot]) -> Result<usize, String> {
@@ -111,53 +219,11 @@ pub async fn persist_metric_snapshots(snapshots: &[TalentSnapshot]) -> Result<us
     }
 
     let captured_at = chrono::Utc::now().to_rfc3339();
-    let logins: Vec<String> = snapshots.iter().map(|s| s.login.clone()).collect();
-    let id_by_login = fetch_talent_ids_by_login(&logins).await?;
-
-    let talent_upserts: Vec<Value> = snapshots
-        .iter()
-        .filter_map(|snapshot| {
-            id_by_login.get(&snapshot.login.to_lowercase()).map(|_| {
-                json!({
-                    "organization_id": DEFAULT_ORG_ID,
-                    "twitch_user_id": snapshot.id,
-                    "login": snapshot.login,
-                    "display_name": if snapshot.login.eq_ignore_ascii_case("nosomevt") {
-                        "Nosome"
-                    } else {
-                        snapshot.display_name.as_str()
-                    },
-                    "avatar_url": snapshot.avatar,
-                    "description": snapshot.description,
-                    "twitch_created_at": snapshot.created_at,
-                    "metadata": {
-                        "is_live": snapshot.is_live,
-                        "viewers": snapshot.viewers,
-                        "category": snapshot.category,
-                        "title": snapshot.title,
-                        "last_twitch_sync_at": captured_at,
-                    }
-                })
-            })
-        })
-        .collect();
-
-    if !talent_upserts.is_empty() {
-        let response = supabase_request(
-            Method::POST,
-            "/rest/v1/talents",
-            Some("?on_conflict=organization_id,login"),
-            Some(Value::Array(talent_upserts)),
-            &[("Prefer", "resolution=merge-duplicates,return=minimal")],
-        )
-        .await?;
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            tracing::warn!(%status, %body, "Falló upsert de talentos");
-        }
+    if let Err(error) = sync_talent_profiles_from_snapshots(snapshots).await {
+        tracing::warn!(%error, "No se pudieron sincronizar perfiles de talentos");
     }
 
+    let logins: Vec<String> = snapshots.iter().map(|s| s.login.clone()).collect();
     let id_by_login = fetch_talent_ids_by_login(&logins).await?;
     let inserts: Vec<Value> = snapshots
         .iter()
@@ -310,6 +376,7 @@ pub async fn insert_stream_event(
     stream_id: Option<&str>,
     category: Option<&str>,
     title: Option<&str>,
+    payload: Option<&serde_json::Value>,
 ) -> Result<(), String> {
     let id_by_login = fetch_talent_ids_by_login(&[login.to_string()]).await?;
     let talent_id = id_by_login.get(&login.to_lowercase());
@@ -322,6 +389,7 @@ pub async fn insert_stream_event(
         "stream_id": stream_id,
         "category_name": category,
         "title": title,
+        "payload": payload,
         "occurred_at": chrono::Utc::now().to_rfc3339(),
     });
 
@@ -397,13 +465,42 @@ pub async fn fetch_metric_snapshots(
         .collect())
 }
 
-pub async fn fetch_stream_events(hours: u32, login: Option<&str>) -> Result<Vec<Value>, String> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamEventRow {
+    pub id: i64,
+    pub login: String,
+    pub event_type: String,
+    pub stream_id: Option<String>,
+    pub category_name: Option<String>,
+    pub title: Option<String>,
+    pub payload: Option<serde_json::Value>,
+    pub occurred_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamEventDbRow {
+    id: i64,
+    login: String,
+    event_type: String,
+    stream_id: Option<String>,
+    category_name: Option<String>,
+    title: Option<String>,
+    #[serde(default)]
+    payload: Option<serde_json::Value>,
+    occurred_at: String,
+}
+
+pub async fn fetch_stream_events(
+    hours: u32,
+    login: Option<&str>,
+) -> Result<Vec<StreamEventRow>, String> {
     let since = urlencoding(&(chrono::Utc::now() - chrono::Duration::hours(hours as i64)).to_rfc3339());
     let login_filter = login
         .map(|value| format!("&login=eq.{}", urlencoding(value)))
         .unwrap_or_default();
     let query = format!(
-        "/rest/v1/stream_events?select=id,login,event_type,stream_id,category_name,title,occurred_at&organization_id=eq.{DEFAULT_ORG_ID}&occurred_at=gte.{since}{login_filter}&order=occurred_at.desc&limit=5000"
+        "/rest/v1/stream_events?select=id,login,event_type,stream_id,category_name,title,payload,occurred_at&organization_id=eq.{DEFAULT_ORG_ID}&occurred_at=gte.{since}{login_filter}&order=occurred_at.desc&limit=5000"
     );
     let response = supabase_request(Method::GET, &query, None, None, &[]).await?;
     let status = response.status();
@@ -412,10 +509,23 @@ pub async fn fetch_stream_events(hours: u32, login: Option<&str>) -> Result<Vec<
         tracing::warn!(%status, %body, "No se pudieron leer eventos de transmisión");
         return Err("No se pudieron leer los eventos de transmisión.".into());
     }
-    serde_json::from_str(&body).map_err(|e| {
+    let rows: Vec<StreamEventDbRow> = serde_json::from_str(&body).map_err(|e| {
         tracing::warn!(%e, "Eventos de transmisión no interpretables");
         "No se pudieron interpretar los eventos de transmisión.".to_string()
-    })
+    })?;
+    Ok(rows
+        .into_iter()
+        .map(|row| StreamEventRow {
+            id: row.id,
+            login: row.login,
+            event_type: row.event_type,
+            stream_id: row.stream_id,
+            category_name: row.category_name,
+            title: row.title,
+            payload: row.payload,
+            occurred_at: row.occurred_at,
+        })
+        .collect())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -707,6 +817,7 @@ pub async fn sync_stream_events_from_helix(
                 snapshot.stream_id.as_deref(),
                 Some(snapshot.category.as_str()),
                 Some(snapshot.title.as_str()),
+                None,
             )
             .await?;
             count += 1;
@@ -720,6 +831,7 @@ pub async fn sync_stream_events_from_helix(
                 stream_id,
                 Some(snapshot.category.as_str()),
                 Some(snapshot.title.as_str()),
+                None,
             )
             .await?;
             count += 1;
