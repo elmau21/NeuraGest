@@ -61,9 +61,18 @@ redirigir **solo** al callback de Supabase; luego Supabase redirige a la app Tau
    - Supabase Dashboard → **Authentication** → **Providers** → **Twitch** (mismo Client ID/Secret;
      activa el provider)
 
-3. En Supabase → **Authentication** → **URL Configuration**, incluye en Redirect URLs:
+3. En Supabase → **Authentication** → **URL Configuration**:
 
-   `http://127.0.0.1:14563/auth/callback`
+   - **Site URL**: déjala en Awards (`https://neuralive.online/es/neura-awards` o la que use
+     el web). No la cambies a `127.0.0.1` — rompería Awards.
+   - **Redirect URLs** (allow list), incluye **exactamente**:
+
+     `http://127.0.0.1:14563/auth/callback`
+
+   NeuraGest envía `redirect_to` a ese loopback. Si falta en la allow list o el state OAuth
+   se pierde, GoTrue cae al Site URL (Awards) con `bad_oauth_state` y la app se queda
+   «Esperando autorización…». Antes de reintentar: cierra pestañas de Awards y deja **una**
+   sola ventana de NeuraGest.
 
 4. Ejecuta `npm run tauri:dev` y pulsa **Continuar con Twitch** **desde la app**.
    No abras un link OAuth suelto ni el generador de tokens de la consola Twitch.

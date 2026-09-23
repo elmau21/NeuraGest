@@ -12,5 +12,13 @@ export function humanizeInvokeError(error: unknown): string {
       ? raw
       : `${raw} Cierra otras ventanas de NeuraGest e inténtalo de nuevo.`
   }
+  if (/bad_oauth_state|oauth state not found|enlace de acceso ya no es válido|retorno local|site url/i.test(raw)) {
+    return (
+      raw +
+      (raw.includes('Neura Awards')
+        ? ''
+        : ' Cierra pestañas de Neura Awards, usa una sola ventana de NeuraGest e inténtalo de nuevo.')
+    )
+  }
   return raw
 }

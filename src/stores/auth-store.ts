@@ -206,10 +206,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
     const attempt = ++oauthAttemptId
     await cancelOAuthCallbackListener()
+    // Stay on "opening" until the browser is actually opened (listener ready + URL validated).
     set({ oauthFlow: 'opening', error: null })
     try {
-      set({ oauthFlow: 'waiting' })
-      const profile = await signInWithSupabaseTwitch()
+      const profile = await signInWithSupabaseTwitch({
+        onBrowserOpened: () => {
+          if (attempt === oauthAttemptId) set({ oauthFlow: 'waiting' })
+        },
+      })
       if (attempt !== oauthAttemptId) return
       const session = profileToSession(profile)
       if (!session) throw new Error('Twitch no devolvió un perfil válido.')

@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-shell'
 import type { Session, User } from '@supabase/supabase-js'
 import { humanizeInvokeError } from '@/lib/humanize-error'
+import { prepareDesktopAuthorizeUrl } from '@/services/oauth-authorize-url'
 import { supabase } from '@/services/supabase'
 import { isTauri } from '@/services/twitch'
 
@@ -93,12 +94,19 @@ export async function cancelOAuthCallbackListener(): Promise<void> {
   }
 }
 
-export async function signInWithSupabaseTwitch(): Promise<SupabaseTwitchLoginResult> {
+export type SignInTwitchHooks = {
+  /** Fired only after the loopback listener is bound and the browser is opened. */
+  onBrowserOpened?: () => void
+}
+
+export async function signInWithSupabaseTwitch(
+  hooks?: SignInTwitchHooks,
+): Promise<SupabaseTwitchLoginResult> {
   if (!supabase || !isTauri) {
     throw new Error('Iniciar sesión con Twitch requiere la app de escritorio NeuraGest.')
   }
 
-  // 1) Bind loopback FIRST so redirect_to always matches a live listener.
+  // 1) Bind loopback FIRST — never open the browser if this fails.
   const boundPort = await invoke<number>('prepare_oauth_callback', {
     preferredPort: OAUTH_CALLBACK_PORT,
     expectedPathPrefix: OAUTH_CALLBACK_PATH,
@@ -122,31 +130,20 @@ export async function signInWithSupabaseTwitch(): Promise<SupabaseTwitchLoginRes
     throw new Error('No se recibió la URL para autorizar Twitch.')
   }
 
-  // Guard: authorize URL must carry our loopback redirect, not Site URL.
+  // 2) Fail closed: require redirect_to=loopback before opening anything.
+  let authorizeUrl: string
   try {
-    const authorize = new URL(data.url)
-    const redirectParam =
-      authorize.searchParams.get('redirect_to') ??
-      authorize.searchParams.get('redirectTo')
-    if (redirectParam) {
-      const decoded = decodeURIComponent(redirectParam)
-      if (!decoded.startsWith(redirectTo)) {
-        await cancelOAuthCallbackListener()
-        throw new Error(
-          `La URL de autorización no usa el retorno local esperado (${redirectTo}).`,
-        )
-      }
-    }
-  } catch (parseError) {
-    if (parseError instanceof Error && parseError.message.includes('retorno local')) {
-      throw parseError
-    }
-    // Non-URL data.url — still try opening; exchange will fail clearly if wrong.
+    authorizeUrl = prepareDesktopAuthorizeUrl(data.url, redirectTo)
+  } catch (guardError) {
+    await cancelOAuthCallbackListener()
+    throw guardError
   }
 
   try {
+    // 3) Start accept BEFORE open so a fast redirect cannot race the listener.
     const callbackPromise = invoke<string>('wait_oauth_callback')
-    await open(data.url)
+    await open(authorizeUrl)
+    hooks?.onBrowserOpened?.()
 
     const callbackUrl = await callbackPromise
     const parsed = new URL(callbackUrl)

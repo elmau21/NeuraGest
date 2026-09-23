@@ -19,4 +19,10 @@ describe('humanizeInvokeError', () => {
       'No se pudo preparar el retorno de inicio de sesión en 127.0.0.1:14563: el puerto está ocupado. Cierra otras ventanas de NeuraGest'
     expect(humanizeInvokeError(new Error(msg))).toContain('Cierra otras ventanas')
   })
+
+  it('añade pista Awards / una sola ventana ante bad_oauth_state', () => {
+    expect(humanizeInvokeError(new Error('OAuth state not found or expired'))).toMatch(
+      /Neura Awards|una sola ventana/i,
+    )
+  })
 })
